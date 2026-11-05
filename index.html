@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>我的家乡 · 任庄村 3D ｜ 河南省信阳市淮滨县固城乡</title>
+<meta name="description" content="一个可以走进去的家乡：豫南淮河岸边的村庄、农田、河流与风俗。" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%BE%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ===================== 载入界面 ===================== -->
+<div id="loading">
+  <div class="load-inner">
+    <div class="load-seal">任庄</div>
+    <h1 class="load-title">我的家乡 <span>3D</span></h1>
+    <div class="load-sub">河南省信阳市淮滨县固城乡 · 任庄村任洼队</div>
+    <div class="load-bar-wrap"><div id="loading-bar"></div></div>
+    <div class="load-row">
+      <span id="loading-text">正在准备…</span>
+      <span id="loading-note">v1.0</span>
+    </div>
+    <div id="loading-tip" class="load-tip">小提示：W A S D 走路，鼠标转视角，按 E 看东西。</div>
+    <button id="start-btn" disabled>正在载入…</button>
+    <div class="load-help">
+      <p><b>操作</b>　WASD 移动 ｜ Shift 跑 ｜ 空格 跳 ｜ Ctrl/C 蹲 ｜ 鼠标 视角 ｜ E 交互 ｜ F 飞行观景 ｜ P 拍照 ｜ M 地图 ｜ J 图鉴 ｜ H 隐藏界面 ｜ Esc 菜单</p>
+      <p><b>说明</b>　这是一个可以用脚步丈量的家乡：砖瓦房、土坯老屋、祠堂、土地庙、麦田、秧田、淮河大堤与渡口，还有四季与昼夜。</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 3D 画布 ===================== -->
+<canvas id="scene"></canvas>
+<div id="vignette"></div>
+
+<!-- ===================== HUD ===================== -->
+<div id="hud">
+  <div id="crosshair"><i></i></div>
+
+  <div id="topbar">
+    <div id="location">
+      <div id="loc-name">任庄村</div>
+      <div id="loc-sub">河南省信阳市淮滨县固城乡 · 任洼队</div>
+    </div>
+    <div id="compass"></div>
+    <div id="clock">
+      <div id="clock-time">08:00</div>
+      <div class="clock-sub"><span id="clock-season">夏</span><i>·</i><span id="clock-term">夏至</span><i>·</i><span id="clock-weather">多云</span></div>
+    </div>
+  </div>
+
+  <div id="quest-panel" class="glass">
+    <div class="panel-title">探索任务</div>
+    <ul id="quest-list"></ul>
+  </div>
+
+  <div id="minimap-wrap">
+    <canvas id="minimap" width="220" height="220"></canvas>
+    <div id="minimap-label">任庄村</div>
+  </div>
+
+  <div id="stat-panel">
+    <span id="fps">-- FPS</span>
+    <span id="coords">X 0 Z 0</span>
+  </div>
+
+  <div id="prompt"><kbd id="prompt-key">E</kbd><span id="prompt-text">查看</span></div>
+
+  <div id="progress">
+    <div id="progress-label">收麦中…</div>
+    <div class="bar"><div id="progress-bar"></div></div>
+  </div>
+
+  <div id="hint"></div>
+  <div id="toasts"></div>
+
+  <div id="quick-bar">
+    <button class="qbtn" data-act="map">M 地图</button>
+    <button class="qbtn" data-act="codex">J 图鉴</button>
+    <button class="qbtn" data-act="photo">P 拍照</button>
+    <button class="qbtn" data-act="fly">F 观景</button>
+    <button class="qbtn" id="btn-help" data-act="help">? 帮助</button>
+  </div>
+</div>
+
+<!-- ===================== 对话 ===================== -->
+<div id="dialogue" class="panel hidden">
+  <div class="dlg-box">
+    <div class="dlg-avatar">乡</div>
+    <div class="dlg-main">
+      <div id="dlg-name">村民</div>
+      <div id="dlg-text">…</div>
+      <div class="dlg-hint">空格 / E 继续　·　Esc 结束</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 图鉴 ===================== -->
+<div id="codex" class="panel hidden">
+  <div class="panel-frame">
+    <div class="panel-head">
+      <h2>家乡图鉴</h2>
+      <span id="codex-count" class="panel-sub">已收录 0 / 0</span>
+      <button id="codex-close" class="close-btn">关闭 (J)</button>
+    </div>
+    <div id="codex-tabs" class="tabs"></div>
+    <div id="codex-grid" class="codex-grid"></div>
+  </div>
+</div>
+
+<!-- ===================== 大地图 ===================== -->
+<div id="map-panel" class="panel hidden">
+  <div class="panel-frame">
+    <div class="panel-head">
+      <h2>任庄村地图</h2>
+      <span class="panel-sub">走近地点即可标记</span>
+      <button id="map-close" class="close-btn">关闭 (M)</button>
+    </div>
+    <div class="map-wrap"><canvas id="map-canvas"></canvas></div>
+  </div>
+</div>
+
+<!-- ===================== 暂停 / 设置 ===================== -->
+<div id="pause" class="panel hidden">
+  <div class="panel-frame narrow">
+    <div class="panel-head"><h2>暂停</h2><span class="panel-sub">Paused</span></div>
+    <div class="pause-btns">
+      <button id="pause-resume" class="btn primary">继续游戏</button>
+      <button id="pause-codex" class="btn">家乡图鉴 (J)</button>
+      <button id="pause-map" class="btn">村庄地图 (M)</button>
+      <button id="pause-photo" class="btn">拍照模式 (P)</button>
+      <button id="pause-save" class="btn">保存进度</button>
+      <button id="pause-load" class="btn">读取进度</button>
+      <button id="pause-restart" class="btn danger">回到村口</button>
+    </div>
+    <div class="settings">
+      <div class="set-row"><label>画质</label>
+        <select id="set-quality">
+          <option value="low">低（流畅）</option>
+          <option value="medium">中</option>
+          <option value="high">高</option>
+          <option value="ultra">极高</option>
+        </select>
+        <span class="set-tip">切换后重新载入场景</span>
+      </div>
+      <div class="set-row"><label>视野 FOV</label><input id="set-fov" type="range" min="55" max="100" step="1" /><span id="set-fov-v" class="set-val"></span></div>
+      <div class="set-row"><label>鼠标灵敏度</label><input id="set-sens" type="range" min="0.2" max="3" step="0.05" /></div>
+      <div class="set-row"><label>音量</label><input id="set-vol" type="range" min="0" max="1" step="0.02" /></div>
+      <div class="set-row"><label>音乐</label><input id="set-music" type="range" min="0" max="1" step="0.02" /></div>
+      <div class="set-row"><label>季节</label>
+        <select id="set-season">
+          <option value="spring">春 · 油菜花与插秧</option>
+          <option value="summer">夏 · 绿稻蝉鸣</option>
+          <option value="autumn">秋 · 金黄的稻浪</option>
+          <option value="winter">冬 · 雪落平原</option>
+        </select>
+      </div>
+      <div class="set-row"><label>天气</label>
+        <select id="set-weather">
+          <option value="clear">晴</option>
+          <option value="fair">多云</option>
+          <option value="overcast">阴</option>
+          <option value="rain">小雨</option>
+          <option value="storm">雷阵雨</option>
+          <option value="snow">雪（冬季）</option>
+        </select>
+      </div>
+      <div class="set-row"><label>时间</label><input id="set-hour" type="range" min="0" max="23.99" step="0.25" /><span id="set-hour-v" class="set-val"></span></div>
+      <div class="set-row"><label>时间流速</label><input id="set-dayspeed" type="range" min="0" max="0.4" step="0.01" /><span class="set-tip">0 = 静止</span></div>
+    </div>
+    <div class="about">
+      <p>在一个可复现的世界里走一走：土坯墙的院子、晒场的石磙、淮河大堤上的风。
+      建议用 <b>高</b> 画质并戴上耳机。</p>
+      <p class="tiny">地图与民俗内容为创作性复原，可在 <code>src/game/culture.js</code> 中修改为你家的真实情况。</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 拍照模式 ===================== -->
+<div id="photo-bar" class="hidden">
+  <div class="photo-inner">
+    <span class="photo-title">拍照模式</span>
+    <label>滤镜
+      <select id="photo-filter">
+        <option value="none">原色</option>
+        <option value="film">怀旧胶片</option>
+        <option value="bw">黑白</option>
+        <option value="warm">暖阳</option>
+        <option value="cool">清冷</option>
+        <option value="sepia">老照片</option>
+      </select>
+    </label>
+    <label>焦距 <input id="photo-fov" type="range" min="18" max="100" step="1" /></label>
+    <button id="photo-shot" class="btn primary">拍照 (空格) 保存 PNG</button>
+    <button id="photo-hud" class="btn">显示界面 (H)</button>
+    <button id="photo-exit" class="btn">退出 (P)</button>
+  </div>
+</div>
+
+<!-- ===================== 帮助 ===================== -->
+<div id="help" class="panel hidden">
+  <div class="panel-frame narrow">
+    <div class="panel-head"><h2>操作与玩法</h2><button id="help-close" class="close-btn">关闭</button></div>
+    <div class="help-body">
+      <table>
+        <tr><td>W A S D</td><td>前后左右走动（Shift 奔跑，Ctrl/C 蹲下，空格 跳）</td></tr>
+        <tr><td>鼠标</td><td>转动视角（点击画面锁定鼠标，Esc 解锁）</td></tr>
+        <tr><td>E</td><td>交互：看地点、聊村民、收庄稼、拾信物、上船</td></tr>
+        <tr><td>F</td><td>切换飞行观景模式（鸟瞰全村）</td></tr>
+        <tr><td>P</td><td>拍照模式（可换滤镜、调焦距、存 PNG）</td></tr>
+        <tr><td>M / J</td><td>村庄地图 / 家乡图鉴</td></tr>
+        <tr><td>H</td><td>隐藏或显示界面</td></tr>
+        <tr><td>[ / ]</td><td>减慢 / 加快时间</td></tr>
+        <tr><td>Esc</td><td>暂停菜单（设置季节、天气、时间、画质）</td></tr>
+      </table>
+      <p class="tiny">这个世界是程序化生成的：地形、河流、房屋、庄稼、树木、天空与声音都由代码当场绘制与合成，
+      没有任何外部图片或音频文件。</p>
+    </div>
+  </div>
+</div>
+
+<div id="fade"></div>
+
+<!-- ===================== 脚本 ===================== -->
+<script>
+/* 脚本按顺序载入。加 ?v= 参数是为了在改代码后让浏览器重新拉取文件：
+   地址栏加上 ?v=2 即可强制刷新全部脚本（正常游玩不用管）。 */
+(function () {
+  var V = (function () {
+    var m = /[?&]v=([^&]+)/.exec(location.search);
+    return m ? m[1] : '1';
+  })();
+  var files = [
+    'vendor/three/three.min.js',
+    'src/core/util.js',
+    'src/core/textures.js',
+    'src/core/audio.js',
+    'src/core/input.js',
+    'src/core/hud.js',
+    'src/world/sky.js',
+    'src/world/terrain.js',
+    'src/world/buildings.js',
+    'src/world/props.js',
+    'src/world/public.js',
+    'src/world/vegetation.js',
+    'src/world/farm.js',
+    'src/world/village.js',
+    'src/game/culture.js',
+    'src/game/npc.js',
+    'src/game/player.js',
+    'src/game/game.js',
+    'src/main.js'
+  ];
+  for (var i = 0; i < files.length; i++) {
+    document.write('<script src="' + files[i] + '?v=' + V + '"><\/script>');
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+# 操作系统 / 编辑器杂项
+Thumbs.db
+desktop.ini
+.DS_Store
+*.log
+
+# 依赖与构建产物（本项目无需构建，留作备用）
+node_modules/
+dist/
