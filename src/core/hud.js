@@ -33,7 +33,7 @@
     const ids = [
       'loading', 'loading-bar', 'loading-text', 'loading-tip', 'start-btn', 'loading-note',
       'hud', 'crosshair', 'loc-name', 'loc-sub', 'clock-time', 'clock-season', 'clock-term', 'clock-weather',
-      'quest-list', 'quest-panel', 'compass', 'minimap', 'minimap-label', 'prompt', 'prompt-text', 'prompt-key',
+      'quest-list', 'quest-panel', 'quest-toggle', 'quest-count', 'quest-caret', 'compass', 'minimap', 'minimap-label', 'prompt', 'prompt-text', 'prompt-key',
       'progress', 'progress-bar', 'progress-label', 'toasts', 'hint',
       'dialogue', 'dlg-name', 'dlg-text', 'dlg-avatar',
       'codex', 'codex-grid', 'codex-count', 'codex-tabs', 'codex-close',
@@ -45,6 +45,12 @@
       'fade',
     ];
     for (const id of ids) HUD.el[id] = $(id);
+    // 任务清单：点标题折叠/展开（HUD.init 可能被调用多次，只绑定一次）
+    HUD.questsVisible = true;
+    if (HUD.el['quest-toggle'] && !HUD._questBound) {
+      HUD._questBound = true;
+      HUD.el['quest-toggle'].addEventListener('click', function () { HUD.toggleQuests(); });
+    }
     // 从 localStorage 读取设置
     HUD.settings = Object.assign({
       quality: 'high', fov: 68, sensitivity: 1.0, volume: 0.85, music: 0.45,
@@ -156,7 +162,9 @@
     const ul = HUD.el['quest-list'];
     if (!ul) return;
     ul.innerHTML = '';
+    let done = 0;
     for (const q of list) {
+      if (q.done) done++;
       const li = document.createElement('li');
       li.className = 'quest' + (q.done ? ' done' : '') + (q.newly ? ' newly' : '');
       li.innerHTML =
@@ -168,6 +176,27 @@
     }
     const panel = HUD.el['quest-panel'];
     if (panel) panel.classList.toggle('hidden', list.length === 0);
+    const cnt = HUD.el['quest-count'];
+    if (cnt) cnt.textContent = done + '/' + list.length;
+    // 有更新时展开，并在数秒后自动隐藏
+    HUD.showQuests(true);
+    HUD.scheduleQuestHide();
+  };
+  /** 展开/收起任务清单 */
+  HUD.showQuests = function (show) {
+    HUD.questsVisible = !!show;
+    const p = HUD.el['quest-panel'];
+    if (p) p.classList.toggle('collapsed', !HUD.questsVisible);
+  };
+  HUD.toggleQuests = function () {
+    HUD.showQuests(!HUD.questsVisible);
+    if (HUD.questsVisible) HUD.scheduleQuestHide();
+    else if (HUD._questTimer) { clearTimeout(HUD._questTimer); HUD._questTimer = null; }
+  };
+  /** 数秒后自动隐藏（收起为小标题） */
+  HUD.scheduleQuestHide = function (ms) {
+    if (HUD._questTimer) clearTimeout(HUD._questTimer);
+    HUD._questTimer = setTimeout(function () { HUD.showQuests(false); }, ms || 6000);
   };
 
   /* ---------------- 对话 ---------------- */

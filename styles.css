@@ -151,6 +151,18 @@ canvas#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: bl
 .q-name { color: #f0e6cc; font-size: 13px; letter-spacing: 1px; }
 .q-desc { color: #b6ab92; font-size: 11px; line-height: 1.5; }
 .q-num { color: var(--gold); font-size: 11px; }
+
+/* 任务清单：可折叠 + 自动隐藏 */
+#quest-toggle {
+  display: flex; align-items: center; width: 100%;
+  background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: left;
+}
+.q-count { font-family: var(--font-ui); font-size: 11px; letter-spacing: 0; color: #cbbf9e; margin-left: 6px; }
+#quest-caret { margin-left: auto; font-style: normal; font-size: 12px; opacity: 0.75; transition: transform 0.2s ease; }
+#quest-panel.collapsed { width: auto; padding: 7px 12px; }
+#quest-panel.collapsed #quest-list { display: none; }
+#quest-panel.collapsed .panel-title { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+#quest-panel.collapsed #quest-caret { transform: rotate(-90deg); }
 .quest.newly { animation: quest-glow 2.4s ease 1; }
 @keyframes quest-glow {
   0% { background: rgba(216,178,90,0.0); }
@@ -422,16 +434,21 @@ body.mobile { overscroll-behavior: none; -webkit-user-select: none; user-select:
 #touch-menu { position: absolute; right: 16px; top: 66px; pointer-events: auto; touch-action: none; }
 
 /* 手机模式下重排 HUD，避免与触屏控件打架 */
-body.mobile #minimap-wrap { left: 12px; top: 76px; bottom: auto; width: 112px; height: 112px; }
-body.mobile #minimap { width: 112px; height: 112px; }
-body.mobile #quest-panel { top: 76px; right: 12px; width: 186px; font-size: 11px; max-height: 42vh; overflow: auto; }
+body.mobile #hud { z-index: 16; }            /* 让可点元素（任务折叠）浮在“看”区之上 */
+body.mobile #compass { display: none; }      /* 罗盘太宽，小屏会溢出 */
+body.mobile #topbar { padding: 0 10px; }
+body.mobile #location { max-width: 52vw; }
+body.mobile #minimap-wrap { left: 10px; top: 74px; bottom: auto; width: 108px; height: 108px; }
+body.mobile #minimap { width: 108px; height: 108px; }
+body.mobile #quest-panel { top: 124px; right: 10px; width: 190px; font-size: 11px; max-height: 34vh; overflow: auto; }
+body.mobile #quest-panel.collapsed { width: auto; overflow: visible; }
 body.mobile #stat-panel { display: none; }
 body.mobile #quick-bar { display: none; }
 body.mobile #loc-name { font-size: 18px; }
 body.mobile #loc-sub { display: none; }
-body.mobile #clock { min-width: 104px; padding: 4px 9px; }
+body.mobile #clock { min-width: 0; padding: 4px 9px; }
 body.mobile #clock-time { font-size: 19px; }
-body.mobile #prompt { bottom: 214px; }
+body.mobile #prompt { top: auto; bottom: 34%; left: 32%; }
 body.mobile .panel-frame { width: 96vw; max-height: 94vh; }
 body.mobile .panel-frame.narrow { width: 96vw; }
 body.mobile .set-row { flex-wrap: wrap; row-gap: 4px; }
@@ -440,7 +457,7 @@ body.mobile .map-wrap { overflow: auto; }
 body.mobile .map-wrap canvas { max-width: 100%; height: auto; }
 
 @media (max-width: 520px) {
-  body.mobile #quest-panel { width: 156px; font-size: 10px; }
+  body.mobile #quest-panel { width: 156px; font-size: 10px; max-height: 26vh; }
   #touch-actions { bottom: 96px; right: 12px; }
   .tbtn { width: 54px; height: 54px; }
   .tbtn.wide { width: 118px; }
