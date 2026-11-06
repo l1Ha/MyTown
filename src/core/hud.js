@@ -39,7 +39,7 @@
       'codex', 'codex-grid', 'codex-count', 'codex-tabs', 'codex-close',
       'map-panel', 'map-canvas', 'map-close',
       'pause', 'pause-resume', 'pause-save', 'pause-load', 'pause-codex', 'pause-map', 'pause-photo', 'pause-restart',
-      'set-quality', 'set-fov', 'set-fov-v', 'set-sens', 'set-vol', 'set-music', 'set-season', 'set-weather', 'set-hour', 'set-hour-v', 'set-dayspeed',
+      'set-quality', 'set-fov', 'set-fov-v', 'set-sens', 'set-vol', 'set-music', 'set-season', 'set-weather', 'set-hour', 'set-hour-v', 'set-dayspeed', 'set-mobile',
       'photo-bar', 'photo-exit', 'photo-shot', 'photo-fov', 'photo-filter', 'photo-hud',
       'fps', 'coords', 'stat-panel', 'help', 'help-close', 'btn-help', 'quick-bar', 'version-tag',
       'fade',
@@ -49,7 +49,7 @@
     HUD.settings = Object.assign({
       quality: 'high', fov: 68, sensitivity: 1.0, volume: 0.85, music: 0.45,
       season: 'summer', weather: 'fair', hour: 8, dayspeed: 0.02, photofilter: 'none',
-      invertY: false,
+      invertY: false, mobile: 'auto',
     }, HUD.loadSettings());
     HUD.culture = MT.Culture;
   };
@@ -509,9 +509,9 @@
     ctx.font = 'bold 15px "KaiTi",serif';
     ctx.fillStyle = 'rgba(255,246,220,0.8)';
     ctx.textAlign = 'left';
-    ctx.fillText('任庄村 · 任洼队', 14, size - 16);
+    ctx.fillText('我的家乡', 14, size - 16);
     ctx.font = '11px sans-serif';
-    ctx.fillText('河南省信阳市淮滨县固城乡', 14, size - 2);
+    ctx.fillText('豫南 · 淮河岸边', 14, size - 2);
   };
 
   /* ---------------- 面板切换 ---------------- */
@@ -547,6 +547,7 @@
     set('set-weather', s.weather);
     set('set-hour', s.hour);
     set('set-dayspeed', s.dayspeed);
+    set('set-mobile', s.mobile);
     set('photo-filter', s.photofilter);
   };
 

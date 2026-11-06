@@ -77,9 +77,9 @@
       this.terrain = new MT.Terrain({ rng: new MT.RNG(20240715), quality: this.quality });
       this.scene.add(this.terrain.group);
       this.player.terrain = this.terrain;
-      this.player.spawnAt(14, 26, Math.PI * 0.92);
+      this.player.spawnAt(14, 26, 0.12);   // 面向北（-Z），朝村口大槐树
 
-      await step(0.54, '盖房子（任庄村 · 任洼队）…', 1);
+      await step(0.54, '盖房子（村口与院落）…', 1);
       this.village = new MT.Village(this.scene, this.terrain, {
         rng: new MT.RNG(4242), season: this.sky.season,
       });
@@ -147,7 +147,7 @@
 
       this.player = new MT.Player(this.camera, null, { fov: HUD.settings.fov || 68 });
       this.player.position.set(14, 8, 26);
-      this.player.yaw = Math.PI * 0.92;
+      this.player.yaw = 0.12;
     }
 
     _finalizeWorld() {
@@ -175,7 +175,7 @@
 
     _initHUD() {
       HUD.init({ game: this });
-      HUD.setLocation('任庄村', '河南省信阳市淮滨县固城乡 · 任洼队');
+      HUD.setLocation('我的家乡', '豫南 · 淮河岸边');
       HUD.initMinimap(this.terrain);
       HUD.pois = this.village.pois;
       HUD.collectibles = this.village.collectibles;
@@ -193,6 +193,8 @@
     _bindUI() {
       // 接入输入系统（键盘/鼠标/指针锁定的监听器都在这里注册）
       MT.Input.init(this.canvas);
+      // 手机 / 触屏模式
+      if (MT.Touch) { MT.Touch.init(); this.applyMobileMode(); }
       const el = HUD.el;
       const self = this;
       const on = (id, ev, fn) => { const e = el[id]; if (e) e.addEventListener(ev, fn); };
@@ -225,6 +227,7 @@
       on('set-weather', 'change', (e) => { s.weather = e.target.value; self.sky.setWeather(s.weather); HUD.saveSettings(); });
       on('set-hour', 'input', (e) => { s.hour = parseFloat(e.target.value); self.sky.hour = s.hour; const v = el['set-hour-v']; if (v) v.textContent = fmtClock12(s.hour); HUD.saveSettings(); });
       on('set-dayspeed', 'input', (e) => { s.dayspeed = parseFloat(e.target.value); self.sky.daySpeed = s.dayspeed; HUD.saveSettings(); });
+      on('set-mobile', 'change', (e) => { s.mobile = e.target.value; self.applyMobileMode(); HUD.saveSettings(); });
 
       // 快捷按钮
       document.querySelectorAll('#quick-bar .qbtn').forEach((b) => {
@@ -234,6 +237,14 @@
           else if (act === 'codex') HUD.openCodex();
           else if (act === 'photo') self.setPhoto(true);
           else if (act === 'fly') self.toggleFly();
+          else if (act === 'mobile') {
+            const on = !(MT.Touch && MT.Touch.enabled);
+            s.mobile = on ? 'on' : 'off';
+            self.applyMobileMode();
+            if (el['set-mobile']) el['set-mobile'].value = s.mobile;
+            HUD.saveSettings();
+            HUD.toast(on ? '手机模式已开启：左摇杆走路，右侧拖动转视角' : '手机模式已关闭', 'unlock', 2600);
+          }
           else if (act === 'help') { const h = el['help']; if (h) { const open = h.classList.contains('hidden'); h.classList.toggle('hidden', !open); h.classList.toggle('show', open); } }
         });
       });
@@ -260,8 +271,14 @@
 
       this.canvas.addEventListener('click', () => {
         if (!self.started) return;
+        if (MT.Touch && MT.Touch.enabled) return;   // 触屏模式不用指针锁定
         if (self.paused && !HUD.isDialogueOpen()) return;
         MT.Input.lock();
+      });
+      // 触屏：点对话气泡即可继续
+      const dlgEl = el['dialogue'];
+      if (dlgEl) dlgEl.addEventListener('pointerdown', (e) => {
+        if (MT.Touch && MT.Touch.enabled) { e.preventDefault(); self.advanceDialogue(); }
       });
       window.addEventListener('resize', () => self.onResize());
       window.addEventListener('beforeunload', () => self.save(true));
@@ -279,17 +296,17 @@
       MT.Audio.ambience.start();
       MT.Audio.ambience.setRegion('village');
       this.paused = false;
-      MT.Input.lock();
+      if (!(MT.Touch && MT.Touch.enabled)) MT.Input.lock();
       this.clock.getDelta();
       this._loop();
-      HUD.toast('欢迎回家　·　任庄村', 'unlock', 5200);
+      HUD.toast('欢迎回家　·　我的家乡', 'unlock', 5200);
       HUD.setQuests(this.questList());
     }
     setPaused(p) {
       this.paused = !!p;
       HUD.togglePause(this.paused);
       if (this.paused) { MT.Input.unlock(); MT.Audio.setVolume('music', HUD.settings.music * 0.5); }
-      else { MT.Input.lock(); MT.Audio.setVolume('music', HUD.settings.music); this.clock.getDelta(); }
+      else { if (!(MT.Touch && MT.Touch.enabled)) MT.Input.lock(); MT.Audio.setVolume('music', HUD.settings.music); this.clock.getDelta(); }
       if (!this.paused && HUD.pauseOpen) HUD.togglePause(false);
     }
     setPhoto(on) {
@@ -314,6 +331,13 @@
       this.canvas.style.filter = HUD.photoOpen ? f : 'none';
       this._currentFilter = f;
     }
+    /** 应用手机/触屏模式（依据设置 auto|on|off） */
+    applyMobileMode() {
+      if (!MT.Touch) return;
+      const mode = (HUD.settings && HUD.settings.mobile) || 'auto';
+      MT.Touch.setEnabled(MT.Touch.resolve(mode));
+      if (HUD.el['set-mobile']) HUD.el['set-mobile'].value = mode;
+    }
     takePhoto() {
       try {
         this.renderer.render(this.scene, this.camera);
@@ -331,13 +355,13 @@
         ctx.font = `bold ${fs}px "KaiTi",serif`;
         ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
-        ctx.fillText('任庄村 · 我的家乡 3D', W - fs * 0.9 + 2, H - fs * 1.1 + 2);
+        ctx.fillText('我的家乡 3D', W - fs * 0.9 + 2, H - fs * 1.1 + 2);
         ctx.fillStyle = 'rgba(255,244,218,0.92)';
-        ctx.fillText('任庄村 · 我的家乡 3D', W - fs * 0.9, H - fs * 1.1);
+        ctx.fillText('我的家乡 3D', W - fs * 0.9, H - fs * 1.1);
         const url = out.toDataURL('image/png');
         const a = document.createElement('a');
         a.href = url;
-        a.download = `任庄村_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
+        a.download = `我的家乡_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         HUD.toast('已保存照片到下载目录', 'item');
         MT.Audio.sfx.click();
@@ -359,7 +383,7 @@
     }
     respawn() {
       const p = this.player;
-      p.spawnAt(this.spawn.x, this.spawn.z, Math.PI * 0.92);
+      p.spawnAt(this.spawn.x, this.spawn.z, 0.12);
       p.setMode('walk');
       HUD.toast('回到村口', null, 2400);
     }
@@ -406,14 +430,18 @@
           text: (hit.paddy ? '下田' : '采摘') + hit.name,
         };
       }
-      // 4. 地点（POI）
-      for (const poi of this.village.pois) {
-        const d = Math.hypot(poi.x - p.x, poi.z - p.z);
-        if (d < poi.r && (!best || d < best.dist + 2)) {
-          const known = this.state.discovered[poi.id];
+      // 4. 地点（POI）：最低优先级，且只取最近的一个，避免抢走信物/村民/作物
+      if (!best) {
+        let bp = null, bpd = Infinity;
+        for (const poi of this.village.pois) {
+          const d = Math.hypot(poi.x - p.x, poi.z - p.z);
+          if (d < poi.r && d < bpd) { bpd = d; bp = poi; }
+        }
+        if (bp) {
+          const known = this.state.discovered[bp.id];
           best = {
-            type: 'poi', target: poi, dist: d,
-            text: (known ? '再看一眼　' : '了解　') + poi.name,
+            type: 'poi', target: bp, dist: bpd,
+            text: (known ? '再看一眼　' : '了解　') + bp.name,
           };
         }
       }
@@ -436,6 +464,9 @@
         if (d < bestD) {
           const c = MT.FarmCrops[plot.crop];
           if (!c) continue;
+          // 该季不可见 / 田块没有作物实例时不可交互（避免冬天收割看不见的稻子）
+          const set = this.farm.cropSets && this.farm.cropSets[plot.crop];
+          if (!set || set.mesh.visible === false || set.items.length === 0) continue;
           bestD = d;
           best = { crop: plot.crop, name: c.name, paddy: plot.paddy, dist: d, plot };
         }
@@ -523,7 +554,40 @@
       this.state.discovered[poi.id] = true;
       poi.discovered = true;          // 小地图/大地图上标记出来
       const c = HUD.culture;
-      const entry = c.entries[poi.id] || c.items[poi.id];
+      // 该地点可解锁的图鉴条目（含周边/风俗条目）
+      const near = {
+        market: ['market', 'spring', 'tea', 'festival2', 'lantern'],
+        shop: ['shop', 'produce_grain', 'tea'],
+        temple: ['temple', 'nianhua', 'qingming', 'festival2'],
+        dock: ['dock', 'fish', 'dragonboat'],
+        dock_north: ['dock', 'dragonboat'],
+        river: ['river', 'fish', 'dragonboat'],
+        levee: ['levee'],
+        school: ['school'],
+        committee: ['committee'],
+        oldhouse: ['oldhouse', 'wall', 'two'],
+        wall: ['wall', 'two'],
+        mill: ['mill'],
+        watertower: ['watertower'],
+        pond: ['pond'],
+        lotus: ['lotus'],
+        bigtree: ['bigtree'],
+        oldwell: ['oldwell'],
+        threshing: ['threshing', 'scarecrow', 'midautumn'],
+        paddy: ['paddy', 'season_farming', 'grassland'],
+        wheat: ['wheat', 'season_farming', 'grassland'],
+        greenhouse: ['greenhouse'],
+        canal: ['canal', 'grassland'],
+        forest: ['forest'],
+        wan: ['wan'],
+        clinic: ['clinic'],
+        pump: ['well_irrigation'],
+        hall: ['hall', 'wedding', 'opera', 'qingming'],
+        board: ['board'],
+      };
+      let entry = c.entries[poi.id] || c.items[poi.id];
+      // POI 自身无词条时，退回其解锁列表里的第一条，保证提示框有内容
+      if (!entry && near[poi.id] && near[poi.id].length) entry = c.entries[near[poi.id][0]];
       HUD.unlock(poi.id, !first);
       if (entry) {
         HUD.hint(`<b>${entry.name}</b><br>${entry.text}`, 8000);
@@ -537,7 +601,6 @@
       if (poi.id === 'hall' || poi.id === 'temple') this.state.flags.ritual = true;
       this.updateQuests();
       // 解锁周边图鉴
-      const near = { market: ['market', 'spring'], shop: ['shop', 'produce_grain'], temple: ['temple', 'nianhua'], dock: ['dock', 'fish'], river: ['river'], levee: ['levee'], school: ['school'], committee: ['committee'], oldhouse: ['oldhouse', 'wall'], mill: ['mill'], watertower: ['watertower'], pond: ['pond'], lotus: ['lotus'], bigtree: ['bigtree'], oldwell: ['oldwell'], threshing: ['threshing', 'scarecrow'], paddy: ['paddy', 'season_farming'], wheat: ['wheat', 'season_farming'], greenhouse: ['greenhouse'], canal: ['canal'], forest: ['forest'], wan: ['wan'], clinic: ['clinic'], pump: ['well_irrigation'], hall: ['hall', 'wedding'], board: ['board'] };
       const list = near[poi.id];
       if (list) list.forEach((id) => HUD.unlock(id, true));
     }
@@ -564,7 +627,7 @@
         this.state.rides++;
         HUD.setFade(0);
         if (MT.Audio.ok) MT.Audio.sfx.splash(1);
-        HUD.hint(r.dock.north ? '回到南岸 · 任庄村这一边。' : '到了北岸 · 另一片滩涂与杨树林。', 5000);
+        HUD.hint(r.dock.north ? '回到南岸 · 家的这一边。' : '到了北岸 · 另一片滩涂与杨树林。', 5000);
         // 对岸观察点
         HUD.unlock('river');
         this.state.flags.river = true;
@@ -657,9 +720,15 @@
       p.position.set(d.pos.x, d.pos.y, d.pos.z);
       p.yaw = d.yaw || 0; p.pitch = d.pitch || 0;
       p.velocity.set(0, 0, 0);
-      this.sky.hour = d.hour || 8;
+      this.sky.hour = (d.hour === undefined) ? 8 : d.hour;   // 注意：0 点是合法值，不能用 || 8
+      if (d.month) this.sky.month = d.month;
+      if (d.day) this.sky.day = d.day;
       if (d.season && d.season !== this.sky.season) this.setSeason(d.season);
-      if (d.weather) { this.sky.setWeather(d.weather, true); HUD.settings.weather = d.weather; }
+      if (d.weather) { this.sky.setWeather(d.weather, true); }
+      // 让设置面板与实际世界保持一致
+      HUD.settings.hour = this.sky.hour;
+      HUD.settings.season = this.sky.season;
+      HUD.settings.weather = this.sky.weather;
       const s = d.state || {};
       this.state.discovered = s.discovered || {};
       this.state.taken = s.taken || {};
@@ -859,7 +928,7 @@
       const nearPoi = this._nearestPoiName();
       if (nearPoi !== this._lastPoiName) {
         this._lastPoiName = nearPoi;
-        if (nearPoi) HUD.setLocation(nearPoi, '河南省信阳市淮滨县固城乡 · 任庄村任洼队');
+        if (nearPoi) HUD.setLocation(nearPoi, '豫南 · 淮河岸边');
       }
     }
 
@@ -870,7 +939,7 @@
         const d = Math.hypot(poi.x - p.x, poi.z - p.z);
         if (d < bd) { bd = d; best = poi; }
       }
-      return best ? best.name : '任庄村';
+      return best ? best.name : '我的家乡';
     }
   }
 

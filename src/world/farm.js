@@ -86,6 +86,8 @@
           if (MT.inBuildZone(px, pz, 4)) return false;           // 建筑区
           if (Math.hypot(px + 8, pz - 82) < 22) return false;   // 打谷场
           if (Math.hypot(px - 104, pz - 64) < 26) return false;  // 藕塘
+          for (const gh of [[112, 96], [128, 112], [-140, 126], [-158, 142], [200, 60]]) if (Math.hypot(px - gh[0], pz - gh[1]) < 16) return false;   // 大棚
+          for (const wl of [[70, 110], [-80, 180], [180, -40], [-200, 60], [90, 240]]) if (Math.hypot(px - wl[0], pz - wl[1]) < 10) return false;        // 机井
           const h = T.heightAt(px, pz);
           if (!paddy && h < 3.0) return false;
           if (paddy && (h < 2.2 || h > 8.5)) return false;
@@ -94,8 +96,15 @@
         return true;
       };
 
+      const intersects = (x, z, w, d) => {
+        for (const q of this.plots) {
+          if (Math.abs(x - q.x) < (w + q.w) / 2 && Math.abs(z - q.z) < (d + q.d) / 2) return true;
+        }
+        return false;
+      };
       const addCell = (x, z, w, d, crop, paddy, seedRot) => {
         if (!usable(x, z, w, d, paddy)) return;
+        if (intersects(x, z, w, d)) return;   // 避免不同网格区域的田块互相重叠
         this.plots.push({ x, z, w, d, crop, paddy: !!paddy, r: seedRot || 0 });
       };
 
@@ -633,7 +642,10 @@
       const dx = Math.max(0, Math.abs(x - p.x) - p.w / 2);
       const dz = Math.max(0, Math.abs(z - p.z) - p.d / 2);
       const d = Math.hypot(dx, dz);
-      if (d < bestD) { bestD = d; best = p; }
+      if (d >= bestD) continue;
+      const set = this.cropSets[p.crop];
+      if (!set || set.mesh.visible === false || set.items.length === 0) continue;  // 该季不可见/无作物
+      bestD = d; best = p;
     }
     if (!best || bestD > r) return null;
     const crop = CROPS[best.crop];

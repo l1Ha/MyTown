@@ -25,7 +25,7 @@
       this.terrain = terrain;
       this.position = new THREE.Vector3(14, 0, 26);   // 脚底位置
       this.velocity = new THREE.Vector3();
-      this.yaw = Math.PI;      // 面向 -Z（北，朝向淮河）
+      this.yaw = 0;            // 0 = 面向 -Z（北，朝淮河 / 村口）
       this.pitch = -0.05;
       this.mode = 'walk';
       this.flySpeed = 14;
@@ -295,8 +295,7 @@
 
       // 地形贴合
       const gh = T.heightAt(p.x, p.z);
-      const waterHere = T.waterAt(p.x, p.z);
-      const groundY = (waterHere && waterHere.y > gh) ? gh : gh;
+      const groundY = gh;   // 站在地形上；深水由 swimming 分支单独处理
       if (p.y <= groundY + 0.02) {
         p.y = groundY;
         if (this.velocity.y < 0) {

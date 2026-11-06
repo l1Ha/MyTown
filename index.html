@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>我的家乡 · 任庄村 3D ｜ 河南省信阳市淮滨县固城乡</title>
+<title>我的家乡 3D ｜ 一个可以走进去的豫南乡村</title>
 <meta name="description" content="一个可以走进去的家乡：豫南淮河岸边的村庄、农田、河流与风俗。" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%BE%3C/text%3E%3C/svg%3E" />
 <link rel="stylesheet" href="styles.css" />
@@ -13,9 +13,9 @@
 <!-- ===================== 载入界面 ===================== -->
 <div id="loading">
   <div class="load-inner">
-    <div class="load-seal">任庄</div>
+    <div class="load-seal">家乡</div>
     <h1 class="load-title">我的家乡 <span>3D</span></h1>
-    <div class="load-sub">河南省信阳市淮滨县固城乡 · 任庄村任洼队</div>
+    <div class="load-sub">一个可以走进去的豫南乡村</div>
     <div class="load-bar-wrap"><div id="loading-bar"></div></div>
     <div class="load-row">
       <span id="loading-text">正在准备…</span>
@@ -40,8 +40,8 @@
 
   <div id="topbar">
     <div id="location">
-      <div id="loc-name">任庄村</div>
-      <div id="loc-sub">河南省信阳市淮滨县固城乡 · 任洼队</div>
+      <div id="loc-name">我的家乡</div>
+      <div id="loc-sub">豫南 · 淮河岸边</div>
     </div>
     <div id="compass"></div>
     <div id="clock">
@@ -57,7 +57,7 @@
 
   <div id="minimap-wrap">
     <canvas id="minimap" width="220" height="220"></canvas>
-    <div id="minimap-label">任庄村</div>
+    <div id="minimap-label">我的家乡</div>
   </div>
 
   <div id="stat-panel">
@@ -80,6 +80,7 @@
     <button class="qbtn" data-act="codex">J 图鉴</button>
     <button class="qbtn" data-act="photo">P 拍照</button>
     <button class="qbtn" data-act="fly">F 观景</button>
+    <button class="qbtn" data-act="mobile">手机</button>
     <button class="qbtn" id="btn-help" data-act="help">? 帮助</button>
   </div>
 </div>
@@ -113,7 +114,7 @@
 <div id="map-panel" class="panel hidden">
   <div class="panel-frame">
     <div class="panel-head">
-      <h2>任庄村地图</h2>
+      <h2>家乡地图</h2>
       <span class="panel-sub">走近地点即可标记</span>
       <button id="map-close" class="close-btn">关闭 (M)</button>
     </div>
@@ -168,8 +169,17 @@
       </div>
       <div class="set-row"><label>时间</label><input id="set-hour" type="range" min="0" max="23.99" step="0.25" /><span id="set-hour-v" class="set-val"></span></div>
       <div class="set-row"><label>时间流速</label><input id="set-dayspeed" type="range" min="0" max="0.4" step="0.01" /><span class="set-tip">0 = 静止</span></div>
+      <div class="set-row"><label>手机模式</label>
+        <select id="set-mobile">
+          <option value="auto">自动（触屏设备开启）</option>
+          <option value="on">开启（摇杆 + 拖动视角）</option>
+          <option value="off">关闭（键鼠）</option>
+        </select>
+        <span class="set-tip">触屏操作</span>
+      </div>
     </div>
     <div class="about">
+      <p>这片风景的原型是 <b>河南省信阳市淮滨县固城乡 · 任庄村任洼队</b>。</p>
       <p>在一个可复现的世界里走一走：土坯墙的院子、晒场的石磙、淮河大堤上的风。
       建议用 <b>高</b> 画质并戴上耳机。</p>
       <p class="tiny">地图与民俗内容为创作性复原，可在 <code>src/game/culture.js</code> 中修改为你家的真实情况。</p>
@@ -237,6 +247,7 @@
     'src/core/textures.js',
     'src/core/audio.js',
     'src/core/input.js',
+    'src/core/touch.js',
     'src/core/hud.js',
     'src/world/sky.js',
     'src/world/terrain.js',

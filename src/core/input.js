@@ -74,10 +74,7 @@
 
     window.addEventListener('mousemove', (e) => {
       if (!Input.locked) return;
-      const dx = e.movementX || 0;
-      const dy = e.movementY || 0;
-      Input.mouse.dx += dx * Input.sensitivity;
-      Input.mouse.dy += dy * Input.sensitivity * (Input.invertY ? -1 : 1);
+      Input.lookBy(e.movementX || 0, e.movementY || 0);
     });
 
     dom.addEventListener('wheel', (e) => {
@@ -131,13 +128,11 @@
     for (let i = 0; i < codes.length; i++) if (Input.keys[codes[i]]) return true;
     return false;
   };
-  /** 本帧刚按下（消费型） */
+  /** 本帧刚按下（只看 pressedOnce，按键已抬起也能识别，避免快速点按漏检） */
   Input.justPressed = function (action) {
     const codes = KEYMAP[action];
     if (!codes) return false;
-    for (let i = 0; i < codes.length; i++) {
-      if (Input.keys[codes[i]] && Input.pressedOnce[codes[i]]) return true;
-    }
+    for (let i = 0; i < codes.length; i++) if (Input.pressedOnce[codes[i]]) return true;
     return false;
   };
   Input.consumePressed = function (action) {
@@ -145,7 +140,7 @@
     if (!codes) return false;
     let hit = false;
     for (let i = 0; i < codes.length; i++) {
-      if (Input.keys[codes[i]] && Input.pressedOnce[codes[i]]) { hit = true; Input.pressedOnce[codes[i]] = false; }
+      if (Input.pressedOnce[codes[i]]) { hit = true; Input.pressedOnce[codes[i]] = false; }
     }
     return hit;
   };
@@ -170,6 +165,24 @@
     out.x = Input.mouse.dx; out.y = Input.mouse.dy;
     Input.mouse.dx = 0; Input.mouse.dy = 0;
     return out;
+  };
+
+  /** 视角增量（触屏/摇杆用，像素值，自动乘灵敏度） */
+  Input.lookBy = function (dx, dy) {
+    Input.mouse.dx += dx * Input.sensitivity;
+    Input.mouse.dy += dy * Input.sensitivity * (Input.invertY ? -1 : 1);
+  };
+  /** 虚拟"按住"（触屏按钮）：直接置位对应按键 */
+  Input.virtualHold = function (action, down) {
+    const codes = KEYMAP[action];
+    if (!codes) return;
+    for (let i = 0; i < codes.length; i++) Input.keys[codes[i]] = !!down;
+  };
+  /** 虚拟"轻点"（触屏按钮）：置位 pressedOnce，交由 consumePressed 消费 */
+  Input.virtualPress = function (action) {
+    const codes = KEYMAP[action];
+    if (!codes) return;
+    for (let i = 0; i < codes.length; i++) Input.pressedOnce[codes[i]] = true;
   };
 
   Input.endFrame = function () {
