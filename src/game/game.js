@@ -128,6 +128,9 @@
       this.renderer.toneMappingExposure = 1.0;
       if ('outputColorSpace' in this.renderer) this.renderer.outputColorSpace = THREE.SRGBColorSpace;
       this.maxAniso = this.renderer.capabilities.getMaxAnisotropy ? this.renderer.capabilities.getMaxAnisotropy() : 4;
+      // 供程序化贴图使用：各向异性上限 + 分辨率随画质缩放
+      MT.maxAniso = this.maxAniso;
+      MT.TEX_SCALE = this.quality === 'low' ? 0.25 : this.quality === 'medium' ? 0.5 : 1;
     }
 
     _initScene() {

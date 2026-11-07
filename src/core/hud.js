@@ -52,11 +52,16 @@
       HUD.el['quest-toggle'].addEventListener('click', function () { HUD.toggleQuests(); });
     }
     // 从 localStorage 读取设置
+    const savedSettings = HUD.loadSettings();
     HUD.settings = Object.assign({
       quality: 'high', fov: 68, sensitivity: 1.0, volume: 0.85, music: 0.45,
       season: 'summer', weather: 'fair', hour: 8, dayspeed: 0.02, photofilter: 'none',
       invertY: false, mobile: 'auto',
-    }, HUD.loadSettings());
+    }, savedSettings);
+    // 触屏设备且用户没手动设过画质时，默认中画质（更省电、更流畅）
+    if (savedSettings.quality === undefined && MT.Touch && MT.Touch.isTouchDevice && MT.Touch.isTouchDevice()) {
+      HUD.settings.quality = 'medium';
+    }
     HUD.culture = MT.Culture;
   };
 

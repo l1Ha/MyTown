@@ -24,7 +24,10 @@
     draw(ctx, size);
     const t = new THREE.CanvasTexture(c);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.anisotropy = opts.aniso === undefined ? 4 : opts.aniso;
+    t.anisotropy = opts.aniso === undefined ? aniso() : opts.aniso;
+    t.generateMipmaps = true;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.magFilter = THREE.LinearFilter;
     if (opts.srgb !== false) t.colorSpace = THREE.SRGBColorSpace;
     t.needsUpdate = true;
     cache[key] = t;
@@ -37,6 +40,7 @@
     draw(c.getContext('2d'), size);
     const t = new THREE.CanvasTexture(c);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = aniso();
     t.colorSpace = THREE.NoColorSpace;
     cache[key] = t;
     return t;
@@ -75,25 +79,82 @@
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
     }
   }
+
+  /** 目标分辨率：随画质缩放（high/ultra=1，medium=0.5，low=0.25），保持 2 的幂 */
+  function qsize(base) {
+    const s = (MT.TEX_SCALE === undefined ? 1 : MT.TEX_SCALE);
+    const f = s >= 0.99 ? 1 : s >= 0.7 ? 0.5 : 0.25;
+    return Math.max(64, Math.round(base * f));
+  }
+  function aniso() { return Math.min(MT.maxAniso || 4, 8); }
+
+  /** 小尺寸 fbm 噪声画布（会被放大成柔和的斑驳） */
+  function noiseCanvas(n, seed, oct) {
+    const c = document.createElement('canvas');
+    c.width = c.height = n;
+    const ctx = c.getContext('2d');
+    const img = ctx.createImageData(n, n);
+    const d = img.data;
+    const nn = new MT.Noise(seed || 1);
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const v = (nn.fbm(x / n * 3.2, y / n * 3.2, oct || 4) * 0.5 + 0.5) * 255;
+        const i = (y * n + x) * 4;
+        d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return c;
+  }
+  const _noiseCache = Object.create(null);
+  function cachedNoise(n, seed, oct) {
+    const k = n + ':' + seed + ':' + oct;
+    return _noiseCache[k] || (_noiseCache[k] = noiseCanvas(n, seed, oct));
+  }
+  /** 在画面上叠一层柔和的 fbm 斑驳（大尺度明暗），比白噪声更像"岁月" */
+  function mottle(ctx, size, opts = {}) {
+    const n = opts.n || 96;
+    const src = cachedNoise(n, opts.seed || 3, opts.oct || 4);
+    ctx.save();
+    ctx.globalAlpha = opts.alpha === undefined ? 0.18 : opts.alpha;
+    ctx.globalCompositeOperation = opts.mode || 'overlay';
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(src, 0, 0, n, n, 0, 0, size, size);
+    ctx.restore();
+  }
+
+  /** 砖墙：错缝、倒角高光/阴影、砖面斑驳、砂浆颗粒、偶发缺损 */
   function brickPattern(ctx, size, cols, rows, mortar, faces) {
     ctx.fillStyle = mortar; ctx.fillRect(0, 0, size, size);
-    const bw = size / cols, bh = size / rows, m = Math.max(1.5, bh * 0.14);
+    mottle(ctx, size, { alpha: 0.12, seed: 41, mode: 'multiply' });
+    const bw = size / cols, bh = size / rows, m = Math.max(1.5, bh * 0.13);
     for (let r = 0; r < rows; r++) {
       const off = (r % 2) * bw * 0.5;
       for (let c = -1; c <= cols; c++) {
         const x = c * bw + off + m * 0.5;
         const y = r * bh + m * 0.5;
         const w = bw - m, h = bh - m;
-        const f = faces();
-        ctx.fillStyle = f;
+        ctx.fillStyle = faces();
         ctx.fillRect(x, y, w, h);
-        // 砖面轻微明暗
-        ctx.fillStyle = 'rgba(255,255,255,0.06)';
-        ctx.fillRect(x, y, w, Math.max(1, h * 0.18));
-        ctx.fillStyle = 'rgba(0,0,0,0.10)';
+        // 倒角：上/左受光，下/右背光
+        ctx.fillStyle = 'rgba(255,255,255,0.13)';
+        ctx.fillRect(x, y, w, Math.max(1, h * 0.16));
+        ctx.fillRect(x, y, Math.max(1, w * 0.05), h);
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
         ctx.fillRect(x, y + h - Math.max(1, h * 0.16), w, Math.max(1, h * 0.16));
+        ctx.fillRect(x + w - Math.max(1, w * 0.05), y, Math.max(1, w * 0.05), h);
+        // 破损/深色砖
+        if (Math.random() < 0.07) {
+          ctx.fillStyle = 'rgba(46,32,24,0.22)';
+          ctx.beginPath();
+          ctx.arc(x + Math.random() * w, y + Math.random() * h, Math.max(1.2, bh * 0.16), 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
+    // 整体做旧 + 细颗粒
+    mottle(ctx, size, { alpha: 0.14, seed: 67, n: 128 });
+    splotch(ctx, size, 30, size * 0.02, size * 0.1, () => ['rgba(60,52,40,0.14)', 'rgba(60,52,40,0)']);
   }
 
   /* 透明贴图的"底色"：避免 mipmap 把透明区平均成黑色（否则远处庄稼会发黑） */
@@ -108,139 +169,197 @@
    * ========================================================= */
   const T = {
     /* ---- 红砖墙（豫南乡村最常见的清水砖墙）---- */
-    brickRed: () => tex('brickRed', 512, (ctx, s) => {
-      const base = [[196, 96, 74], [176, 78, 60], [212, 112, 88], [160, 70, 56], [188, 88, 68]];
-      brickPattern(ctx, s, 8, 26, '#c9bfae', () => {
+    brickRed: () => tex('brickRed', qsize(1024), (ctx, s) => {
+      const base = [[201, 101, 78], [176, 78, 60], [214, 116, 92], [158, 68, 54], [190, 90, 70], [168, 74, 58]];
+      brickPattern(ctx, s, 10, 21, '#cdc3b2', () => {
         const c = base[(Math.random() * base.length) | 0];
-        const k = 0.88 + Math.random() * 0.24;
+        const k = 0.86 + Math.random() * 0.28;
         return `rgb(${(c[0] * k) | 0},${(c[1] * k) | 0},${(c[2] * k) | 0})`;
       });
-      grain(ctx, s, 16);
+      grain(ctx, s, 12);
     }),
 
     /* ---- 青砖墙 ---- */
-    brickGrey: () => tex('brickGrey', 512, (ctx, s) => {
-      const base = [[124, 128, 126], [104, 110, 110], [136, 138, 134], [92, 98, 100], [116, 120, 118]];
-      brickPattern(ctx, s, 8, 26, '#a8a49a', () => {
+    brickGrey: () => tex('brickGrey', qsize(1024), (ctx, s) => {
+      const base = [[124, 128, 126], [104, 110, 110], [138, 140, 136], [92, 98, 100], [116, 120, 118], [110, 116, 114]];
+      brickPattern(ctx, s, 10, 21, '#aeaa9e', () => {
         const c = base[(Math.random() * base.length) | 0];
-        const k = 0.9 + Math.random() * 0.2;
+        const k = 0.9 + Math.random() * 0.22;
         return `rgb(${(c[0] * k) | 0},${(c[1] * k) | 0},${(c[2] * k) | 0})`;
       });
-      grain(ctx, s, 14);
-    }),
-
-    /* ---- 白石灰墙（刷白灰/月白）---- */
-    whitewash: () => tex('whitewash', 512, (ctx, s) => {
-      ctx.fillStyle = '#e8e4d8'; ctx.fillRect(0, 0, s, s);
-      splotch(ctx, s, 90, 20, 90, () => ['rgba(214,208,190,0.35)', 'rgba(214,208,190,0)']);
-      splotch(ctx, s, 60, 10, 50, () => ['rgba(255,253,244,0.5)', 'rgba(255,253,244,0)']);
-      // 墙裙灰
-      const g = ctx.createLinearGradient(0, s * 0.72, 0, s);
-      g.addColorStop(0, 'rgba(120,116,104,0)');
-      g.addColorStop(1, 'rgba(104,100,90,0.55)');
-      ctx.fillStyle = g; ctx.fillRect(0, s * 0.72, s, s * 0.28);
       grain(ctx, s, 10);
     }),
 
+    /* ---- 白石灰墙（刷白灰/月白）---- */
+    whitewash: () => tex('whitewash', qsize(1024), (ctx, s) => {
+      ctx.fillStyle = '#eae6da'; ctx.fillRect(0, 0, s, s);
+      splotch(ctx, s, 110, 18, 90, () => ['rgba(212,206,188,0.32)', 'rgba(212,206,188,0)']);
+      splotch(ctx, s, 70, 8, 46, () => ['rgba(255,253,246,0.5)', 'rgba(255,253,246,0)']);
+      // 雨痕
+      ctx.strokeStyle = 'rgba(150,146,132,0.10)';
+      for (let i = 0; i < 26; i++) {
+        const x = Math.random() * s; ctx.lineWidth = 1 + Math.random() * 3;
+        ctx.beginPath(); ctx.moveTo(x, Math.random() * s * 0.4);
+        ctx.lineTo(x + (Math.random() - 0.5) * 6, s * 0.8 + Math.random() * s * 0.2); ctx.stroke();
+      }
+      // 墙裙灰
+      const g = ctx.createLinearGradient(0, s * 0.72, 0, s);
+      g.addColorStop(0, 'rgba(120,116,104,0)');
+      g.addColorStop(1, 'rgba(96,92,82,0.6)');
+      ctx.fillStyle = g; ctx.fillRect(0, s * 0.72, s, s * 0.28);
+      mottle(ctx, s, { alpha: 0.10, seed: 19, mode: 'multiply' });
+      grain(ctx, s, 8);
+    }),
+
     /* ---- 夯土墙（老屋土坯）---- */
-    mudWall: () => tex('mudWall', 512, (ctx, s) => {
-      ctx.fillStyle = '#bfa47c'; ctx.fillRect(0, 0, s, s);
-      splotch(ctx, s, 140, 12, 70, () => ['rgba(168,142,104,0.45)', 'rgba(168,142,104,0)']);
-      splotch(ctx, s, 90, 8, 40, () => ['rgba(214,192,158,0.5)', 'rgba(214,192,158,0)']);
+    mudWall: () => tex('mudWall', qsize(1024), (ctx, s) => {
+      ctx.fillStyle = '#c1a67e'; ctx.fillRect(0, 0, s, s);
+      // 夯土层
+      const bands = 13;
+      for (let b = 0; b < bands; b++) {
+        const y0 = b * s / bands;
+        const k = 0.9 + Math.random() * 0.2;
+        ctx.fillStyle = `rgba(${(190 * k) | 0},${(162 * k) | 0},${(120 * k) | 0},0.35)`;
+        ctx.fillRect(0, y0, s, s / bands * 0.7);
+        ctx.fillStyle = 'rgba(120,96,64,0.18)';
+        ctx.fillRect(0, y0 + s / bands - 2, s, 2);
+      }
+      splotch(ctx, s, 150, 10, 70, () => ['rgba(168,142,104,0.4)', 'rgba(168,142,104,0)']);
+      splotch(ctx, s, 90, 8, 40, () => ['rgba(216,194,160,0.45)', 'rgba(216,194,160,0)']);
       // 麦草筋
-      ctx.strokeStyle = 'rgba(198,176,130,0.55)';
-      for (let i = 0; i < 260; i++) {
+      for (let i = 0; i < 420; i++) {
         const x = Math.random() * s, y = Math.random() * s, a = Math.random() * Math.PI;
-        const l = 6 + Math.random() * 16;
-        ctx.lineWidth = 1 + Math.random();
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
+        const l = 6 + Math.random() * 20;
+        ctx.strokeStyle = `rgba(${(190 + Math.random() * 30) | 0},${(166 + Math.random() * 26) | 0},${(120 + Math.random() * 26) | 0},0.5)`;
+        ctx.lineWidth = 1 + Math.random() * 1.4;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); ctx.stroke();
+      }
+      // 裂纹
+      ctx.strokeStyle = 'rgba(96,76,52,0.4)';
+      for (let i = 0; i < 10; i++) {
+        let x = Math.random() * s, y = Math.random() * s;
+        ctx.lineWidth = 1 + Math.random() * 1.6;
+        ctx.beginPath(); ctx.moveTo(x, y);
+        for (let k = 0; k < 6; k++) { x += (Math.random() - 0.5) * 40; y += Math.random() * 36; ctx.lineTo(x, y); }
         ctx.stroke();
       }
-      grain(ctx, s, 20);
+      mottle(ctx, s, { alpha: 0.16, seed: 29 });
+      grain(ctx, s, 16);
     }),
 
     /* ---- 青灰小瓦（屋瓦）---- */
-    roofTile: () => tex('roofTile', 512, (ctx, s) => {
-      ctx.fillStyle = '#4d5359'; ctx.fillRect(0, 0, s, s);
-      const cols = 22, rows = 8;
+    roofTile: () => tex('roofTile', qsize(1024), (ctx, s) => {
+      ctx.fillStyle = '#3f454b'; ctx.fillRect(0, 0, s, s);
+      const cols = 14, rows = 7;
       const cw = s / cols, ch = s / rows;
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const x = c * cw, y = r * ch;
-          const g = ctx.createLinearGradient(x, y, x + cw, y);
           const k = 0.82 + Math.random() * 0.36;
-          const c1 = `rgb(${(86 * k) | 0},${(94 * k) | 0},${(101 * k) | 0})`;
-          const c2 = `rgb(${(52 * k) | 0},${(58 * k) | 0},${(64 * k) | 0})`;
-          g.addColorStop(0, c1); g.addColorStop(0.45, c2); g.addColorStop(1, c1);
-          ctx.fillStyle = g;
-          ctx.fillRect(x + 0.6, y, cw - 1.2, ch);
-          // 瓦楞阴影
-          ctx.fillStyle = 'rgba(0,0,0,0.35)';
-          ctx.fillRect(x, y, 1.4, ch);
-          ctx.fillStyle = 'rgba(255,255,255,0.10)';
-          ctx.fillRect(x + cw * 0.42, y, cw * 0.1, ch);
+          // 筒瓦横截面的弧形明暗
+          const g = ctx.createLinearGradient(x, 0, x + cw, 0);
+          g.addColorStop(0.00, `rgb(${(44 * k) | 0},${(50 * k) | 0},${(56 * k) | 0})`);
+          g.addColorStop(0.16, `rgb(${(96 * k) | 0},${(104 * k) | 0},${(112 * k) | 0})`);
+          g.addColorStop(0.42, `rgb(${(58 * k) | 0},${(64 * k) | 0},${(70 * k) | 0})`);
+          g.addColorStop(0.62, `rgb(${(74 * k) | 0},${(82 * k) | 0},${(90 * k) | 0})`);
+          g.addColorStop(1.00, `rgb(${(40 * k) | 0},${(46 * k) | 0},${(52 * k) | 0})`);
+          ctx.fillStyle = g; ctx.fillRect(x, y, cw, ch);
+          ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(x, y, Math.max(1, cw * 0.06), ch);
+          ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(x + cw * 0.14, y, cw * 0.06, ch);
           // 横向搭接
-          ctx.fillStyle = 'rgba(0,0,0,0.28)';
-          ctx.fillRect(x, y + ch - 2, cw, 2);
+          ctx.fillStyle = 'rgba(0,0,0,0.30)'; ctx.fillRect(x, y + ch - 3, cw, 3);
         }
       }
-      splotch(ctx, s, 40, 8, 40, () => ['rgba(120,132,110,0.16)', 'rgba(120,132,110,0)']);
-      grain(ctx, s, 14);
+      splotch(ctx, s, 70, 8, 46, () => ['rgba(110,124,96,0.18)', 'rgba(110,124,96,0)']);
+      splotch(ctx, s, 30, 6, 30, () => ['rgba(30,34,38,0.25)', 'rgba(30,34,38,0)']);
+      mottle(ctx, s, { alpha: 0.14, seed: 53 });
+      grain(ctx, s, 10);
     }),
 
     /* ---- 水泥屋面 / 平顶 ---- */
-    concrete: () => tex('concrete', 512, (ctx, s) => {
-      ctx.fillStyle = '#a9a49a'; ctx.fillRect(0, 0, s, s);
-      splotch(ctx, s, 120, 14, 80, () => ['rgba(150,146,136,0.35)', 'rgba(150,146,136,0)']);
-      splotch(ctx, s, 60, 6, 30, () => ['rgba(196,192,182,0.4)', 'rgba(196,192,182,0)']);
-      grain(ctx, s, 22);
+    concrete: () => tex('concrete', qsize(512), (ctx, s) => {
+      ctx.fillStyle = '#aaa59b'; ctx.fillRect(0, 0, s, s);
+      splotch(ctx, s, 130, 12, 80, () => ['rgba(150,146,136,0.32)', 'rgba(150,146,136,0)']);
+      splotch(ctx, s, 70, 6, 30, () => ['rgba(198,194,184,0.4)', 'rgba(198,194,184,0)']);
+      // 抹灰刀痕
+      ctx.strokeStyle = 'rgba(160,156,146,0.25)';
+      for (let i = 0; i < 14; i++) {
+        ctx.lineWidth = 2 + Math.random() * 4; const y = Math.random() * s;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.bezierCurveTo(s * 0.3, y - 8, s * 0.6, y + 8, s, y); ctx.stroke();
+      }
+      // 骨料
+      for (let i = 0; i < 2600; i++) {
+        const x = Math.random() * s, y = Math.random() * s, r = 0.4 + Math.random() * 1.1;
+        ctx.fillStyle = Math.random() < 0.5 ? 'rgba(210,206,196,0.5)' : 'rgba(96,92,84,0.45)';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+      }
+      mottle(ctx, s, { alpha: 0.14, seed: 71, mode: 'multiply' });
+      grain(ctx, s, 16);
     }),
 
     /* ---- 水泥路面 / 打谷场 ---- */
-    cementRoad: () => tex('cementRoad', 512, (ctx, s) => {
-      ctx.fillStyle = '#b3b0a8'; ctx.fillRect(0, 0, s, s);
-      grain(ctx, s, 30);
-      splotch(ctx, s, 90, 10, 60, () => ['rgba(146,142,132,0.3)', 'rgba(146,142,132,0)']);
-      // 伸缩缝
-      ctx.strokeStyle = 'rgba(90,86,78,0.5)'; ctx.lineWidth = 3;
+    cementRoad: () => tex('cementRoad', qsize(512), (ctx, s) => {
+      ctx.fillStyle = '#b5b2aa'; ctx.fillRect(0, 0, s, s);
+      grain(ctx, s, 26);
+      splotch(ctx, s, 100, 10, 60, () => ['rgba(146,142,132,0.3)', 'rgba(146,142,132,0)']);
+      for (let i = 0; i < 2200; i++) {
+        const x = Math.random() * s, y = Math.random() * s, r = 0.4 + Math.random();
+        ctx.fillStyle = Math.random() < 0.5 ? 'rgba(212,208,198,0.4)' : 'rgba(104,100,92,0.4)';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+      }
+      ctx.strokeStyle = 'rgba(84,80,72,0.55)'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.moveTo(0, s * 0.5); ctx.lineTo(s, s * 0.5 + 4); ctx.stroke();
+      mottle(ctx, s, { alpha: 0.12, seed: 83, mode: 'multiply' });
     }),
 
     /* ---- 土路 ---- */
-    dirtRoad: () => tex('dirtRoad', 512, (ctx, s) => {
+    dirtRoad: () => tex('dirtRoad', qsize(512), (ctx, s) => {
       ctx.fillStyle = '#a3906d'; ctx.fillRect(0, 0, s, s);
-      splotch(ctx, s, 150, 10, 70, () => ['rgba(140,120,90,0.4)', 'rgba(140,120,90,0)']);
-      splotch(ctx, s, 80, 6, 40, () => ['rgba(190,172,138,0.45)', 'rgba(190,172,138,0)']);
+      splotch(ctx, s, 160, 8, 70, () => ['rgba(140,120,90,0.4)', 'rgba(140,120,90,0)']);
+      splotch(ctx, s, 90, 6, 40, () => ['rgba(190,172,138,0.42)', 'rgba(190,172,138,0)']);
       // 车辙
-      ctx.fillStyle = 'rgba(120,104,78,0.35)';
+      ctx.fillStyle = 'rgba(120,104,78,0.32)';
       ctx.fillRect(0, s * 0.24, s, s * 0.06);
       ctx.fillRect(0, s * 0.68, s, s * 0.06);
-      grain(ctx, s, 26);
+      // 小石子
+      for (let i = 0; i < 1400; i++) {
+        const x = Math.random() * s, y = Math.random() * s, r = 0.5 + Math.random() * 1.6;
+        ctx.fillStyle = Math.random() < 0.5 ? 'rgba(196,182,152,0.5)' : 'rgba(108,92,68,0.5)';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+      }
+      mottle(ctx, s, { alpha: 0.16, seed: 97 });
+      grain(ctx, s, 22);
     }),
 
     /* ---- 田地土壤 ---- */
-    soil: () => tex('soil', 512, (ctx, s) => {
+    soil: () => tex('soil', qsize(512), (ctx, s) => {
       ctx.fillStyle = '#6d5a41'; ctx.fillRect(0, 0, s, s);
-      splotch(ctx, s, 200, 8, 60, () => ['rgba(88,72,52,0.5)', 'rgba(88,72,52,0)']);
-      splotch(ctx, s, 120, 6, 40, () => ['rgba(128,108,80,0.45)', 'rgba(128,108,80,0)']);
-      grain(ctx, s, 30);
+      splotch(ctx, s, 220, 6, 60, () => ['rgba(88,72,52,0.5)', 'rgba(88,72,52,0)']);
+      splotch(ctx, s, 130, 5, 40, () => ['rgba(128,108,80,0.45)', 'rgba(128,108,80,0)']);
+      // 土块
+      for (let i = 0; i < 900; i++) {
+        const x = Math.random() * s, y = Math.random() * s, r = 1 + Math.random() * 3, k = 0.7 + Math.random() * 0.6;
+        ctx.fillStyle = `rgba(${(120 * k) | 0},${(98 * k) | 0},${(70 * k) | 0},0.6)`;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+      }
+      mottle(ctx, s, { alpha: 0.18, seed: 113, mode: 'multiply' });
+      grain(ctx, s, 26);
     }),
 
     /* ---- 草地 ---- */
-    grass: () => tex('grass', 512, (ctx, s) => {
-      ctx.fillStyle = '#5d7a3c'; ctx.fillRect(0, 0, s, s);
-      for (let i = 0; i < 5200; i++) {
-        const x = Math.random() * s, y = Math.random() * s;
-        const h = 3 + Math.random() * 8;
-        const k = 0.7 + Math.random() * 0.7;
-        ctx.strokeStyle = `rgba(${(96 * k) | 0},${(126 * k) | 0},${(58 * k) | 0},0.75)`;
-        ctx.lineWidth = 1 + Math.random();
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (Math.random() - 0.5) * 3, y - h); ctx.stroke();
+    grass: () => tex('grass', qsize(1024), (ctx, s) => {
+      ctx.fillStyle = '#5a763a'; ctx.fillRect(0, 0, s, s);
+      mottle(ctx, s, { alpha: 0.22, seed: 127, n: 128 });
+      const N = s >= 1024 ? 14000 : 5200;
+      for (let i = 0; i < N; i++) {
+        const x = Math.random() * s, y = Math.random() * s, h = 3 + Math.random() * 9, k = 0.6 + Math.random() * 0.8;
+        ctx.strokeStyle = `rgba(${(96 * k) | 0},${(128 * k) | 0},${(56 * k) | 0},0.7)`;
+        ctx.lineWidth = 0.8 + Math.random() * 1.2;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (Math.random() - 0.5) * 4, y - h); ctx.stroke();
       }
-      splotch(ctx, s, 70, 16, 70, () => ['rgba(126,146,72,0.25)', 'rgba(126,146,72,0)']);
-      grain(ctx, s, 14);
+      splotch(ctx, s, 80, 14, 70, () => ['rgba(126,146,72,0.22)', 'rgba(126,146,72,0)']);
+      splotch(ctx, s, 30, 10, 40, () => ['rgba(70,92,44,0.28)', 'rgba(70,92,44,0)']);
+      grain(ctx, s, 10);
     }),
 
     /* ---- 水面法线扰动（当作 normal 近似使用）---- */
@@ -267,106 +386,172 @@
     }),
 
     /* ---- 树皮 ---- */
-    bark: () => tex('bark', 256, (ctx, s) => {
+    bark: () => tex('bark', qsize(512), (ctx, s) => {
       ctx.fillStyle = '#7a6a56'; ctx.fillRect(0, 0, s, s);
-      for (let i = 0; i < 300; i++) {
-        const x = Math.random() * s;
-        ctx.strokeStyle = `rgba(${40 + Math.random() * 60},${32 + Math.random() * 50},${24 + Math.random() * 40},0.5)`;
-        ctx.lineWidth = 1 + Math.random() * 3;
+      mottle(ctx, s, { alpha: 0.2, seed: 7 });
+      for (let i = 0; i < 260; i++) {
+        const x = Math.random() * s, w = 1 + Math.random() * 4;
+        ctx.strokeStyle = `rgba(${(34 + Math.random() * 40) | 0},${(26 + Math.random() * 34) | 0},${(18 + Math.random() * 28) | 0},0.55)`;
+        ctx.lineWidth = w;
         ctx.beginPath(); ctx.moveTo(x, 0);
-        for (let y = 0; y < s; y += 12) ctx.lineTo(x + (Math.random() - 0.5) * 5, y);
+        for (let y = 0; y <= s; y += 14) ctx.lineTo(x + (Math.random() - 0.5) * 7, y);
+        ctx.stroke();
+        // 裂隙受光边
+        ctx.strokeStyle = 'rgba(190,172,140,0.18)'; ctx.lineWidth = Math.max(1, w * 0.4);
+        ctx.beginPath(); ctx.moveTo(x + w, 0);
+        for (let y = 0; y <= s; y += 14) ctx.lineTo(x + w + (Math.random() - 0.5) * 7, y);
         ctx.stroke();
       }
-      grain(ctx, s, 20);
-    }),
-
-    /* ---- 木料 / 门板 ---- */
-    wood: () => tex('wood', 256, (ctx, s) => {
-      ctx.fillStyle = '#8a6a45'; ctx.fillRect(0, 0, s, s);
-      for (let i = 0; i < 90; i++) {
-        const y = Math.random() * s;
-        ctx.strokeStyle = `rgba(${70 + Math.random() * 60},${50 + Math.random() * 45},${30 + Math.random() * 35},0.45)`;
-        ctx.lineWidth = 1 + Math.random() * 4;
-        ctx.beginPath(); ctx.moveTo(0, y);
-        for (let x = 0; x < s; x += 16) ctx.lineTo(x, y + (Math.random() - 0.5) * 4);
-        ctx.stroke();
-      }
+      // 横向皮孔
+      ctx.fillStyle = 'rgba(40,32,22,0.35)';
+      for (let i = 0; i < 40; i++) ctx.fillRect(Math.random() * s, Math.random() * s, 6 + Math.random() * 10, 1 + Math.random() * 1.5);
+      splotch(ctx, s, 30, 8, 40, () => ['rgba(96,110,72,0.2)', 'rgba(96,110,72,0)']);
       grain(ctx, s, 16);
     }),
 
+    /* ---- 木料 / 门板 ---- */
+    wood: () => tex('wood', qsize(512), (ctx, s) => {
+      ctx.fillStyle = '#8a6a45'; ctx.fillRect(0, 0, s, s);
+      mottle(ctx, s, { alpha: 0.14, seed: 17 });
+      for (let i = 0; i < 160; i++) {
+        const y = Math.random() * s;
+        ctx.strokeStyle = `rgba(${(70 + Math.random() * 60) | 0},${(50 + Math.random() * 46) | 0},${(30 + Math.random() * 36) | 0},0.4)`;
+        ctx.lineWidth = 0.6 + Math.random() * 3;
+        ctx.beginPath(); ctx.moveTo(0, y);
+        for (let x = 0; x <= s; x += 18) ctx.lineTo(x, y + (Math.random() - 0.5) * 5);
+        ctx.stroke();
+      }
+      // 木节
+      for (let i = 0; i < 4; i++) {
+        const x = Math.random() * s, y = Math.random() * s, r = 4 + Math.random() * 8;
+        for (let k = 0; k < 5; k++) {
+          ctx.strokeStyle = `rgba(60,40,22,${0.5 - k * 0.08})`; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.ellipse(x, y, r - k * 1.4, r * 0.7 - k, 0, 0, 7); ctx.stroke();
+        }
+      }
+      grain(ctx, s, 12);
+    }),
+
     /* ---- 木门（带门板与门钉）---- */
-    door: () => tex('door', 256, (ctx, s) => {
+    door: () => tex('door', qsize(512), (ctx, s) => {
       ctx.fillStyle = '#5d4128'; ctx.fillRect(0, 0, s, s);
-      const panels = 2;
-      const pw = s / panels;
+      mottle(ctx, s, { alpha: 0.12, seed: 23 });
+      const panels = 3, pw = s / panels;
       for (let i = 0; i < panels; i++) {
-        ctx.fillStyle = i % 2 ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.05)';
+        ctx.fillStyle = i % 2 ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.04)';
         ctx.fillRect(i * pw, 0, pw, s);
-        ctx.strokeStyle = '#3d2a17'; ctx.lineWidth = 5;
-        ctx.strokeRect(i * pw + 8, 8, pw - 16, s - 16);
+        for (let g = 0; g < 40; g++) {
+          const x = i * pw + Math.random() * pw;
+          ctx.strokeStyle = `rgba(${(60 + Math.random() * 40) | 0},${(40 + Math.random() * 30) | 0},${(22 + Math.random() * 20) | 0},0.35)`;
+          ctx.lineWidth = 0.8 + Math.random() * 1.6;
+          ctx.beginPath(); ctx.moveTo(x, 0);
+          for (let y = 0; y <= s; y += 20) ctx.lineTo(x + (Math.random() - 0.5) * 3, y);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = '#33230f'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(i * pw, 0); ctx.lineTo(i * pw, s); ctx.stroke();
       }
       ctx.fillStyle = '#3a2916'; ctx.fillRect(s * 0.46, 0, s * 0.08, s);
+      // 门钉
+      for (const ry of [0.28, 0.72]) {
+        for (const cxr of [0.28, 0.72]) {
+          const cx = cxr * s, cy = ry * s;
+          const gg = ctx.createRadialGradient(cx - 2, cy - 2, 0, cx, cy, 9);
+          gg.addColorStop(0, '#d8c184'); gg.addColorStop(1, '#7a6234');
+          ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(cx, cy, 8, 0, 7); ctx.fill();
+        }
+      }
       // 铜环
-      ctx.strokeStyle = '#b9a06a'; ctx.lineWidth = 8;
-      ctx.beginPath(); ctx.arc(s * 0.3, s * 0.52, s * 0.07, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(s * 0.7, s * 0.52, s * 0.07, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#c2a866'; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.arc(s * 0.3, s * 0.52, s * 0.06, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(s * 0.7, s * 0.52, s * 0.06, 0, Math.PI * 2); ctx.stroke();
+      // 底部磨损
+      const gw = ctx.createLinearGradient(0, s * 0.85, 0, s);
+      gw.addColorStop(0, 'rgba(0,0,0,0)'); gw.addColorStop(1, 'rgba(30,20,10,0.4)');
+      ctx.fillStyle = gw; ctx.fillRect(0, s * 0.85, s, s * 0.15);
     }),
 
     /* ---- 玻璃窗（深色反光）---- */
     window: () => tex('window', 256, (ctx, s) => {
       const g = ctx.createLinearGradient(0, 0, s, s);
-      g.addColorStop(0, '#5b7280'); g.addColorStop(0.5, '#33454f'); g.addColorStop(1, '#22303a');
+      g.addColorStop(0, '#6b8493'); g.addColorStop(0.45, '#3a4d58'); g.addColorStop(1, '#1f2c36');
       ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
-      ctx.fillStyle = 'rgba(255,255,255,0.10)';
-      ctx.beginPath(); ctx.moveTo(0, s); ctx.lineTo(s * 0.7, 0); ctx.lineTo(s, 0); ctx.lineTo(0, s); ctx.fill();
+      // 斜向反光
+      const r = ctx.createLinearGradient(0, s, s, 0);
+      r.addColorStop(0, 'rgba(255,255,255,0)');
+      r.addColorStop(0.45, 'rgba(255,255,255,0.14)');
+      r.addColorStop(0.55, 'rgba(255,255,255,0.05)');
+      r.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = r; ctx.fillRect(0, 0, s, s);
+      splotch(ctx, s, 20, 6, 30, () => ['rgba(220,225,225,0.08)', 'rgba(220,225,225,0)']);
       // 窗框
       ctx.strokeStyle = '#e6e2d6'; ctx.lineWidth = 14;
       ctx.strokeRect(7, 7, s - 14, s - 14);
       ctx.lineWidth = 8;
       ctx.beginPath(); ctx.moveTo(s * 0.5, 0); ctx.lineTo(s * 0.5, s); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, s * 0.5); ctx.lineTo(s, s * 0.5); ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 2;
+      ctx.strokeRect(15, 15, s - 30, s - 30);
     }),
 
     /* ---- 稻草 / 柴草 ---- */
-    straw: () => tex('straw', 256, (ctx, s) => {
+    straw: () => tex('straw', qsize(512), (ctx, s) => {
       ctx.fillStyle = '#c8ab63'; ctx.fillRect(0, 0, s, s);
-      for (let i = 0; i < 2200; i++) {
+      mottle(ctx, s, { alpha: 0.16, seed: 31 });
+      for (let i = 0; i < 3000; i++) {
         const x = Math.random() * s, y = Math.random() * s;
         const a = Math.random() * Math.PI;
-        const l = 8 + Math.random() * 22;
-        const k = 0.75 + Math.random() * 0.5;
+        const l = 8 + Math.random() * 26;
+        const k = 0.7 + Math.random() * 0.6;
         ctx.strokeStyle = `rgba(${(206 * k) | 0},${(174 * k) | 0},${(96 * k) | 0},0.8)`;
-        ctx.lineWidth = 1 + Math.random() * 1.6;
+        ctx.lineWidth = 0.8 + Math.random() * 1.6;
         ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); ctx.stroke();
       }
-      grain(ctx, s, 16);
+      grain(ctx, s, 12);
     }),
 
     /* ---- 菜地土垄 ---- */
-    vegetableBed: () => tex('vegetableBed', 256, (ctx, s) => {
+    vegetableBed: () => tex('vegetableBed', qsize(512), (ctx, s) => {
       ctx.fillStyle = '#5b4a34'; ctx.fillRect(0, 0, s, s);
       for (let i = 0; i < 7; i++) {
         const x = (i / 7) * s;
         const g = ctx.createLinearGradient(x, 0, x + s / 7, 0);
-        g.addColorStop(0, 'rgba(0,0,0,0.22)');
-        g.addColorStop(0.5, 'rgba(150,124,88,0.35)');
-        g.addColorStop(1, 'rgba(0,0,0,0.22)');
+        g.addColorStop(0, 'rgba(0,0,0,0.24)');
+        g.addColorStop(0.5, 'rgba(156,130,92,0.4)');
+        g.addColorStop(1, 'rgba(0,0,0,0.24)');
         ctx.fillStyle = g; ctx.fillRect(x, 0, s / 7, s);
       }
-      splotch(ctx, s, 80, 6, 40, () => ['rgba(80,100,50,0.25)', 'rgba(80,100,50,0)']);
-      grain(ctx, s, 20);
+      for (let i = 0; i < 1200; i++) {
+        const x = Math.random() * s, y = Math.random() * s, r = 0.6 + Math.random() * 2;
+        ctx.fillStyle = Math.random() < 0.5 ? 'rgba(150,126,90,0.5)' : 'rgba(60,48,34,0.5)';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+      }
+      splotch(ctx, s, 90, 6, 40, () => ['rgba(80,100,50,0.25)', 'rgba(80,100,50,0)']);
+      mottle(ctx, s, { alpha: 0.14, seed: 37 });
+      grain(ctx, s, 16);
     }),
 
     /* ---- 云 ---- */
-    cloud: () => tex('cloud', 256, (ctx, s) => {
+    cloud: () => tex('cloud', qsize(512), (ctx, s) => {
       ctx.clearRect(0, 0, s, s);
-      for (let i = 0; i < 26; i++) {
-        const x = s * (0.15 + Math.random() * 0.7);
-        const y = s * (0.3 + Math.random() * 0.4);
-        const r = s * (0.08 + Math.random() * 0.16);
+      for (let i = 0; i < 34; i++) {
+        const x = s * (0.1 + Math.random() * 0.8);
+        const y = s * (0.3 + Math.random() * 0.42);
+        const r = s * (0.06 + Math.random() * 0.17);
         const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-        g.addColorStop(0, 'rgba(255,255,255,0.85)');
-        g.addColorStop(0.6, 'rgba(255,255,255,0.35)');
+        g.addColorStop(0, 'rgba(255,255,255,0.9)');
+        g.addColorStop(0.55, 'rgba(255,255,255,0.4)');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      // 顶部受光边缘
+      for (let i = 0; i < 16; i++) {
+        const x = s * (0.15 + Math.random() * 0.7);
+        const y = s * (0.28 + Math.random() * 0.3);
+        const r = s * (0.04 + Math.random() * 0.09);
+        const g = ctx.createRadialGradient(x, y - r * 0.3, 0, x, y, r);
+        g.addColorStop(0, 'rgba(255,255,255,0.7)');
         g.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
@@ -392,34 +577,46 @@
     }),
 
     /* ---- 雪 ---- */
-    snow: () => tex('snow', 512, (ctx, s) => {
+    snow: () => tex('snow', qsize(512), (ctx, s) => {
       ctx.fillStyle = '#eef2f6'; ctx.fillRect(0, 0, s, s);
+      mottle(ctx, s, { alpha: 0.12, seed: 151, n: 128 });
       splotch(ctx, s, 120, 10, 60, () => ['rgba(214,224,234,0.5)', 'rgba(214,224,234,0)']);
       splotch(ctx, s, 60, 6, 30, () => ['rgba(255,255,255,0.7)', 'rgba(255,255,255,0)']);
-      grain(ctx, s, 8);
+      // 雪粒反光
+      for (let i = 0; i < 1200; i++) {
+        ctx.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.9)' : 'rgba(206,220,236,0.6)';
+        ctx.fillRect(Math.random() * s, Math.random() * s, 1, 1);
+      }
+      grain(ctx, s, 6);
     }),
 
     /* ---- 中国古代风格纸纹（UI 备用）---- */
     paper: () => tex('paper', 256, (ctx, s) => {
       ctx.fillStyle = '#efe7d5'; ctx.fillRect(0, 0, s, s);
       splotch(ctx, s, 60, 10, 60, () => ['rgba(206,192,164,0.4)', 'rgba(206,192,164,0)']);
-      grain(ctx, s, 12);
+      // 纸纤维
+      ctx.strokeStyle = 'rgba(196,182,152,0.35)';
+      for (let i = 0; i < 180; i++) {
+        const x = Math.random() * s, y = Math.random() * s, a = Math.random() * Math.PI, l = 3 + Math.random() * 10;
+        ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); ctx.stroke();
+      }
+      grain(ctx, s, 10);
     }),
 
     /* ---- 草叶（带透明通道，用于草地/芦苇）---- */
-    blade: () => tex('blade', 128, (ctx, s) => {
-      baseFill(ctx, s, [86, 118, 48], 0.3);
-      const n = 11;
-      for (let i = 0; i < n; i++) {
-        const x0 = s * (0.06 + Math.random() * 0.88);
-        const h = s * (0.42 + Math.random() * 0.56);
-        const w = s * (0.022 + Math.random() * 0.03);
-        const lean = (Math.random() - 0.5) * s * 0.22;
-        const k = 0.55 + Math.random() * 0.6;
+    blade: () => tex('blade', qsize(256), (ctx, s) => {
+      baseFill(ctx, s, [86, 118, 48], 0.28);
+      for (let i = 0; i < 18; i++) {
+        const x0 = s * (0.05 + Math.random() * 0.9);
+        const h = s * (0.4 + Math.random() * 0.58);
+        const w = s * (0.016 + Math.random() * 0.024);
+        const lean = (Math.random() - 0.5) * s * 0.24;
+        const k = 0.5 + Math.random() * 0.65;
         const g = ctx.createLinearGradient(x0, s, x0 + lean, s - h);
-        g.addColorStop(0, `rgba(${(44 * k) | 0},${(72 * k) | 0},${(30 * k) | 0},0.96)`);
-        g.addColorStop(0.6, `rgba(${(92 * k) | 0},${(134 * k) | 0},${(52 * k) | 0},0.96)`);
-        g.addColorStop(1, `rgba(${(132 * k) | 0},${(178 * k) | 0},${(74 * k) | 0},0.9)`);
+        g.addColorStop(0, `rgba(${(40 * k) | 0},${(68 * k) | 0},${(28 * k) | 0},0.96)`);
+        g.addColorStop(0.55, `rgba(${(92 * k) | 0},${(136 * k) | 0},${(52 * k) | 0},0.96)`);
+        g.addColorStop(1, `rgba(${(140 * k) | 0},${(184 * k) | 0},${(78 * k) | 0},0.9)`);
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.moveTo(x0 - w, s);
@@ -430,131 +627,160 @@
     }),
 
     /* ---- 庄稼（麦/稻/玉米/油菜），带透明通道 ---- */
-    cropWheat: () => tex('cropWheat', 128, (ctx, s) => {
-      baseFill(ctx, s, [198, 172, 100], 0.32);
-      for (let i = 0; i < 9; i++) {
-        const x0 = s * (0.08 + Math.random() * 0.84);
-        const h = s * (0.7 + Math.random() * 0.3);
-        const lean = (Math.random() - 0.5) * s * 0.16;
-        const k = 0.75 + Math.random() * 0.4;
+    cropWheat: () => tex('cropWheat', qsize(256), (ctx, s) => {
+      baseFill(ctx, s, [198, 172, 100], 0.3);
+      for (let i = 0; i < 13; i++) {
+        const x0 = s * (0.06 + Math.random() * 0.88);
+        const h = s * (0.72 + Math.random() * 0.28);
+        const lean = (Math.random() - 0.5) * s * 0.18;
+        const k = 0.72 + Math.random() * 0.42;
         ctx.strokeStyle = `rgba(${(206 * k) | 0},${(178 * k) | 0},${(96 * k) | 0},0.95)`;
-        ctx.lineWidth = 2.4;
+        ctx.lineWidth = 2.2;
         ctx.beginPath(); ctx.moveTo(x0, s);
-        ctx.quadraticCurveTo(x0 + lean * 0.5, s - h * 0.6, x0 + lean, s - h * 0.9);
+        ctx.quadraticCurveTo(x0 + lean * 0.5, s - h * 0.6, x0 + lean, s - h * 0.92);
         ctx.stroke();
+        // 叶片
+        for (let a = 0; a < 2; a++) {
+          const yy = s - h * (0.34 + a * 0.22), dir = a ? 1 : -1;
+          ctx.fillStyle = `rgba(${(158 * k) | 0},${(168 * k) | 0},${(78 * k) | 0},0.85)`;
+          ctx.beginPath(); ctx.moveTo(x0 + lean * 0.3, yy);
+          ctx.quadraticCurveTo(x0 + dir * 12, yy - 6, x0 + dir * 17, yy + 4);
+          ctx.quadraticCurveTo(x0 + dir * 9, yy + 2, x0 + lean * 0.3, yy + 3); ctx.fill();
+        }
         // 麦穗
-        ctx.fillStyle = `rgba(${(222 * k) | 0},${(196 * k) | 0},${(112 * k) | 0},0.98)`;
-        for (let a = 0; a < 6; a++) {
+        ctx.fillStyle = `rgba(${(226 * k) | 0},${(200 * k) | 0},${(116 * k) | 0},0.98)`;
+        for (let a = 0; a < 7; a++) {
+          const yy = s - h * (0.74 + a * 0.038);
           ctx.beginPath();
-          ctx.ellipse(x0 + lean + (a % 2 ? 3 : -3), s - h * (0.72 + a * 0.045), 3.2, 5.4, a % 2 ? 0.4 : -0.4, 0, Math.PI * 2);
+          ctx.ellipse(x0 + lean + (a % 2 ? 3.2 : -3.2), yy, 3.0, 5.2, a % 2 ? 0.42 : -0.42, 0, Math.PI * 2);
           ctx.fill();
         }
       }
       // 麦芒
-      ctx.strokeStyle = 'rgba(232,214,150,0.7)'; ctx.lineWidth = 1;
-      for (let i = 0; i < 40; i++) {
-        const x = Math.random() * s, y = s * (0.1 + Math.random() * 0.35);
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (Math.random() - 0.5) * 10, y - 12); ctx.stroke();
+      ctx.strokeStyle = 'rgba(234,216,152,0.7)'; ctx.lineWidth = 1;
+      for (let i = 0; i < 60; i++) {
+        const x = Math.random() * s, y = s * (0.08 + Math.random() * 0.38);
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (Math.random() - 0.5) * 12, y - 14); ctx.stroke();
       }
     }),
-    cropRice: () => tex('cropRice', 128, (ctx, s) => {
-      baseFill(ctx, s, [118, 158, 68], 0.32);
-      for (let i = 0; i < 13; i++) {
-        const x0 = s * (0.06 + Math.random() * 0.88);
-        const h = s * (0.62 + Math.random() * 0.38);
-        const lean = (Math.random() - 0.5) * s * 0.26;
-        const k = 0.7 + Math.random() * 0.5;
-        const green = `rgba(${(118 * k) | 0},${(160 * k) | 0},${(64 * k) | 0},0.95)`;
-        ctx.strokeStyle = green; ctx.lineWidth = 2.6;
+    cropRice: () => tex('cropRice', qsize(256), (ctx, s) => {
+      baseFill(ctx, s, [118, 158, 68], 0.3);
+      for (let i = 0; i < 16; i++) {
+        const x0 = s * (0.05 + Math.random() * 0.9);
+        const h = s * (0.6 + Math.random() * 0.4);
+        const lean = (Math.random() - 0.5) * s * 0.28;
+        const k = 0.68 + Math.random() * 0.5;
+        ctx.strokeStyle = `rgba(${(118 * k) | 0},${(162 * k) | 0},${(64 * k) | 0},0.95)`;
+        ctx.lineWidth = 2.4;
         ctx.beginPath(); ctx.moveTo(x0, s);
         ctx.quadraticCurveTo(x0 + lean * 0.4, s - h * 0.55, x0 + lean, s - h);
         ctx.stroke();
+        // 稻叶
+        ctx.strokeStyle = `rgba(${(96 * k) | 0},${(140 * k) | 0},${(58 * k) | 0},0.9)`; ctx.lineWidth = 1.6;
+        const yy = s - h * 0.5, dir = Math.random() < 0.5 ? 1 : -1;
+        ctx.beginPath(); ctx.moveTo(x0 + lean * 0.3, yy);
+        ctx.quadraticCurveTo(x0 + dir * 14, yy - 8, x0 + dir * 20, yy + 2); ctx.stroke();
         // 稻穗（下垂）
-        ctx.strokeStyle = `rgba(${(190 * k) | 0},${(196 * k) | 0},${(110 * k) | 0},0.9)`;
-        ctx.lineWidth = 3.4;
+        ctx.strokeStyle = `rgba(${(192 * k) | 0},${(198 * k) | 0},${(112 * k) | 0},0.92)`;
+        ctx.lineWidth = 3.2;
         ctx.beginPath();
         ctx.moveTo(x0 + lean, s - h);
-        ctx.quadraticCurveTo(x0 + lean + 8, s - h + 6, x0 + lean + 4, s - h + 14);
+        ctx.quadraticCurveTo(x0 + lean + 9, s - h + 7, x0 + lean + 4, s - h + 16);
         ctx.stroke();
+        // 谷粒
+        ctx.fillStyle = `rgba(${(206 * k) | 0},${(200 * k) | 0},${(126 * k) | 0},0.85)`;
+        for (let a = 0; a < 4; a++) { ctx.beginPath(); ctx.arc(x0 + lean + 3 + a * 1.2, s - h + 4 + a * 3.4, 1.6, 0, 7); ctx.fill(); }
       }
     }),
-    cropCorn: () => tex('cropCorn', 128, (ctx, s) => {
-      baseFill(ctx, s, [128, 168, 68], 0.32);
-      for (let i = 0; i < 4; i++) {
-        const x0 = s * (0.2 + i * 0.2 + Math.random() * 0.08);
-        const h = s * (0.86 + Math.random() * 0.12);
-        const k = 0.8 + Math.random() * 0.35;
-        ctx.strokeStyle = `rgba(${(126 * k) | 0},${(170 * k) | 0},${(66 * k) | 0},0.97)`;
-        ctx.lineWidth = 4.5;
-        ctx.beginPath(); ctx.moveTo(x0, s); ctx.lineTo(x0 + (Math.random() - 0.5) * 4, s - h); ctx.stroke();
+    cropCorn: () => tex('cropCorn', qsize(256), (ctx, s) => {
+      baseFill(ctx, s, [128, 168, 68], 0.3);
+      for (let i = 0; i < 5; i++) {
+        const x0 = s * (0.18 + i * 0.17 + Math.random() * 0.06);
+        const h = s * (0.88 + Math.random() * 0.1);
+        const k = 0.78 + Math.random() * 0.36;
+        ctx.strokeStyle = `rgba(${(126 * k) | 0},${(172 * k) | 0},${(66 * k) | 0},0.97)`;
+        ctx.lineWidth = 4.2;
+        ctx.beginPath(); ctx.moveTo(x0, s);
+        ctx.quadraticCurveTo(x0 + (Math.random() - 0.5) * 6, s - h * 0.5, x0 + (Math.random() - 0.5) * 6, s - h); ctx.stroke();
         // 叶
-        for (let a = 0; a < 5; a++) {
-          const y = s - h * (0.28 + a * 0.15);
-          const dir = a % 2 ? 1 : -1;
-          ctx.beginPath();
-          ctx.moveTo(x0, y);
-          ctx.quadraticCurveTo(x0 + dir * 22, y - 10, x0 + dir * 34, y + 6);
-          ctx.quadraticCurveTo(x0 + dir * 18, y + 3, x0, y + 4);
-          ctx.fillStyle = `rgba(${(140 * k) | 0},${(184 * k) | 0},${(74 * k) | 0},0.96)`;
-          ctx.fill();
+        for (let a = 0; a < 6; a++) {
+          const y = s - h * (0.22 + a * 0.13);
+          const dir = a % 2 ? 1 : -1, L = 26 + Math.random() * 16;
+          ctx.fillStyle = `rgba(${(140 * k) | 0},${(186 * k) | 0},${(74 * k) | 0},0.96)`;
+          ctx.beginPath(); ctx.moveTo(x0, y);
+          ctx.quadraticCurveTo(x0 + dir * L * 0.7, y - 12, x0 + dir * L, y + 8);
+          ctx.quadraticCurveTo(x0 + dir * L * 0.5, y + 4, x0, y + 5); ctx.fill();
+          ctx.strokeStyle = `rgba(${(96 * k) | 0},${(140 * k) | 0},${(52 * k) | 0},0.5)`; ctx.lineWidth = 0.8;
+          ctx.beginPath(); ctx.moveTo(x0, y + 2); ctx.quadraticCurveTo(x0 + dir * L * 0.7, y - 8, x0 + dir * L, y + 8); ctx.stroke();
         }
         // 玉米棒
         if (i % 2 === 0) {
-          ctx.fillStyle = 'rgba(226,202,120,0.95)';
-          ctx.beginPath(); ctx.ellipse(x0 + 9, s - h * 0.5, 4.6, 12, 0.3, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(232,208,128,0.95)';
+          ctx.beginPath(); ctx.ellipse(x0 + 10, s - h * 0.46, 5, 13, 0.32, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(180,168,96,0.5)';
+          for (let a = 0; a < 5; a++) ctx.fillRect(x0 + 7, s - h * 0.46 - 10 + a * 4.6, 6, 2);
         }
+        // 天花
+        ctx.strokeStyle = 'rgba(196,190,120,0.8)'; ctx.lineWidth = 1.2;
+        for (let a = 0; a < 5; a++) { ctx.beginPath(); ctx.moveTo(x0, s - h); ctx.lineTo(x0 + (a - 2) * 5, s - h - 10); ctx.stroke(); }
       }
     }),
-    cropRape: () => tex('cropRape', 128, (ctx, s) => {
-      baseFill(ctx, s, [160, 176, 76], 0.32);
-      for (let i = 0; i < 12; i++) {
-        const x0 = s * (0.06 + Math.random() * 0.88);
-        const h = s * (0.66 + Math.random() * 0.34);
-        const lean = (Math.random() - 0.5) * s * 0.2;
-        const k = 0.8 + Math.random() * 0.35;
+    cropRape: () => tex('cropRape', qsize(256), (ctx, s) => {
+      baseFill(ctx, s, [160, 176, 76], 0.3);
+      for (let i = 0; i < 15; i++) {
+        const x0 = s * (0.05 + Math.random() * 0.9);
+        const h = s * (0.64 + Math.random() * 0.36);
+        const lean = (Math.random() - 0.5) * s * 0.22;
+        const k = 0.78 + Math.random() * 0.36;
         ctx.strokeStyle = `rgba(${(112 * k) | 0},${(156 * k) | 0},${(62 * k) | 0},0.95)`;
-        ctx.lineWidth = 2.2;
+        ctx.lineWidth = 2.0;
         ctx.beginPath(); ctx.moveTo(x0, s);
         ctx.quadraticCurveTo(x0 + lean * 0.5, s - h * 0.6, x0 + lean, s - h);
         ctx.stroke();
-        // 黄花
-        for (let a = 0; a < 5; a++) {
-          ctx.fillStyle = `rgba(${(246 * k) | 0},${(216 * k) | 0},${(72 * k) | 0},0.97)`;
-          const a2 = a * 1.3;
-          ctx.beginPath();
-          ctx.arc(x0 + lean + Math.cos(a2) * 6, s - h + Math.sin(a2) * 5 - 2, 4.2, 0, Math.PI * 2);
-          ctx.fill();
+        // 叶
+        ctx.fillStyle = `rgba(${(120 * k) | 0},${(168 * k) | 0},${(70 * k) | 0},0.9)`;
+        ctx.beginPath(); ctx.ellipse(x0 + lean * 0.4, s - h * 0.5, 8, 4, 0.4, 0, Math.PI * 2); ctx.fill();
+        // 黄花簇
+        for (let a = 0; a < 7; a++) {
+          const ang = a * 1.05, rr = 7;
+          ctx.fillStyle = `rgba(${(252 * k) | 0},${(220 * k) | 0},${(70 * k) | 0},0.97)`;
+          ctx.beginPath(); ctx.arc(x0 + lean + Math.cos(ang) * rr, s - h + Math.sin(ang) * rr - 2, 3.6, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(255,244,180,0.9)';
+          ctx.beginPath(); ctx.arc(x0 + lean + Math.cos(ang) * rr, s - h + Math.sin(ang) * rr - 2, 1.2, 0, Math.PI * 2); ctx.fill();
         }
       }
     }),
     /* ---- 菜地：白菜/青菜 ---- */
-    cropGreens: () => tex('cropGreens', 128, (ctx, s) => {
-      baseFill(ctx, s, [100, 148, 62], 0.32);
-      for (let i = 0; i < 8; i++) {
-        const x0 = s * (0.12 + Math.random() * 0.76);
-        const y0 = s * (0.55 + Math.random() * 0.42);
-        const k = 0.75 + Math.random() * 0.45;
-        for (let a = 0; a < 7; a++) {
-          const ang = -Math.PI / 2 + (a - 3) * 0.42;
+    cropGreens: () => tex('cropGreens', qsize(256), (ctx, s) => {
+      baseFill(ctx, s, [100, 148, 62], 0.3);
+      for (let i = 0; i < 10; i++) {
+        const x0 = s * (0.1 + Math.random() * 0.8);
+        const y0 = s * (0.5 + Math.random() * 0.46);
+        const k = 0.72 + Math.random() * 0.5;
+        for (let a = 0; a < 9; a++) {
+          const ang = -Math.PI / 2 + (a - 4) * 0.38, L = 26 + Math.random() * 12;
           ctx.beginPath();
           ctx.moveTo(x0, y0);
-          ctx.quadraticCurveTo(x0 + Math.cos(ang) * 14, y0 + Math.sin(ang) * 22,
-            x0 + Math.cos(ang) * 22, y0 + Math.sin(ang) * 34);
-          ctx.lineWidth = 7;
-          ctx.strokeStyle = `rgba(${(92 * k) | 0},${(148 * k) | 0},${(58 * k) | 0},0.95)`;
+          ctx.quadraticCurveTo(x0 + Math.cos(ang) * L * 0.6, y0 + Math.sin(ang) * L * 0.7,
+            x0 + Math.cos(ang) * L, y0 + Math.sin(ang) * L * 1.2);
+          ctx.lineWidth = 6.5;
+          ctx.strokeStyle = `rgba(${(92 * k) | 0},${(150 * k) | 0},${(58 * k) | 0},0.95)`;
+          ctx.stroke();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = `rgba(${(150 * k) | 0},${(196 * k) | 0},${(96 * k) | 0},0.8)`;
           ctx.stroke();
         }
       }
     }),
 
     /* ---- 芦苇 ---- */
-    reed: () => tex('reed', 128, (ctx, s) => {
-      baseFill(ctx, s, [124, 138, 82], 0.3);
-      for (let i = 0; i < 7; i++) {
-        const x0 = s * (0.12 + Math.random() * 0.76);
+    reed: () => tex('reed', qsize(256), (ctx, s) => {
+      baseFill(ctx, s, [124, 138, 82], 0.28);
+      for (let i = 0; i < 10; i++) {
+        const x0 = s * (0.08 + Math.random() * 0.84);
         const h = s * (0.72 + Math.random() * 0.27);
-        const w = s * 0.02;
-        const lean = (Math.random() - 0.5) * s * 0.16;
+        const w = s * 0.016;
+        const lean = (Math.random() - 0.5) * s * 0.18;
         const k = 0.6 + Math.random() * 0.5;
         ctx.strokeStyle = `rgba(${(126 * k) | 0},${(140 * k) | 0},${(84 * k) | 0},0.95)`;
         ctx.lineWidth = w * 2;
@@ -562,25 +788,34 @@
         ctx.moveTo(x0, s);
         ctx.quadraticCurveTo(x0 + lean * 0.5, s - h * 0.55, x0 + lean, s - h * 0.92);
         ctx.stroke();
+        // 叶
+        ctx.strokeStyle = `rgba(${(110 * k) | 0},${(126 * k) | 0},${(74 * k) | 0},0.85)`; ctx.lineWidth = w;
+        ctx.beginPath(); ctx.moveTo(x0 + lean * 0.4, s - h * 0.6);
+        ctx.quadraticCurveTo(x0 + lean * 0.4 + 12, s - h * 0.6 - 4, x0 + lean * 0.4 + 20, s - h * 0.6 + 6); ctx.stroke();
         // 芦花
-        ctx.fillStyle = `rgba(${(196 * k) | 0},${(180 * k) | 0},${(140 * k) | 0},0.9)`;
+        ctx.fillStyle = `rgba(${(200 * k) | 0},${(186 * k) | 0},${(146 * k) | 0},0.9)`;
         ctx.beginPath();
-        ctx.ellipse(x0 + lean, s - h * 0.96, w * 1.8, h * 0.07, 0, 0, Math.PI * 2);
+        ctx.ellipse(x0 + lean, s - h * 0.96, w * 2.2, h * 0.075, 0, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = `rgba(${(206 * k) | 0},${(194 * k) | 0},${(158 * k) | 0},0.6)`; ctx.lineWidth = 0.8;
+        for (let a = 0; a < 6; a++) {
+          ctx.beginPath(); ctx.moveTo(x0 + lean, s - h * 0.96);
+          ctx.lineTo(x0 + lean + (Math.random() - 0.5) * 10, s - h * 0.96 - 8 - Math.random() * 6); ctx.stroke();
+        }
       }
     }),
 
     /* ---- 水波（用于水面的简易法线贴图）---- */
-    waterNormal: () => dataTex('waterNormal', 256, (ctx, s) => {
-      const n = new MT.Noise(31);
+    waterNormal: () => dataTex('waterNormal', qsize(512), (ctx, s) => {
+      const n = new MT.Noise(31), n2 = new MT.Noise(77);
       const img = ctx.createImageData(s, s);
       const d = img.data;
-      const f = 0.045;
+      const f = 0.03;
       for (let y = 0; y < s; y++) {
         for (let x = 0; x < s; x++) {
-          const h = n.fbm(x * f, y * f, 3);
-          const hx = n.fbm((x + 1) * f, y * f, 3);
-          const hy = n.fbm(x * f, (y + 1) * f, 3);
+          const h = n.fbm(x * f, y * f, 4) * 0.7 + n2.fbm(x * 0.11, y * 0.11, 3) * 0.3;
+          const hx = n.fbm((x + 1) * f, y * f, 4) * 0.7 + n2.fbm((x + 1) * 0.11, y * 0.11, 3) * 0.3;
+          const hy = n.fbm(x * f, (y + 1) * f, 4) * 0.7 + n2.fbm(x * 0.11, (y + 1) * 0.11, 3) * 0.3;
           const dx = (hx - h) * 6, dy = (hy - h) * 6;
           const l = Math.hypot(dx, dy, 1);
           const i = (y * s + x) * 4;
@@ -741,7 +976,7 @@
     if (bg === 'none' || bg === null) ctx.clearRect(0, 0, w, h);
     else { ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); }
     if (opts.grain !== false && bg !== 'none' && bg !== null) {
-      ctx.save(); ctx.globalAlpha = 0.10; grain(ctx, Math.min(w, h), 14); ctx.restore();
+      grain(ctx, Math.min(w, h), 6);   // putImageData 忽略 globalAlpha，改用较小的量级
     }
     const lines = opts.lines || String(text).split('\n');
     const vertical = !!opts.vertical;
@@ -774,7 +1009,7 @@
     }
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 4;
+    t.anisotropy = aniso();
     cache[ck] = t;
     return t;
   }
