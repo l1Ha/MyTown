@@ -57,66 +57,114 @@
       const shoeMat = new THREE.MeshStandardMaterial({ color: 0x2a2620, roughness: 0.9 });
       this.shirtMat = shirtMat;
 
-      // 躯干
-      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.36 * s, 0.55 * s, 0.22 * s), shirtMat);
-      torso.position.y = 1.06 * s;
+      // 体型差异（肩宽 / 肚子 / 袖长）
+      const belly = old ? r.range(1.05, 1.35) : (this.role === 'farmer' ? r.range(0.95, 1.2) : r.range(0.9, 1.05));
+      const shoulderW = r.range(0.9, 1.15);
+      const shortSleeve = r.chance(0.6);
+      const creamMat = new THREE.MeshStandardMaterial({ color: 0xece6d6, roughness: 0.95 });
+
+      // 躯干（圆润的胶囊体，压扁成椭圆截面）
+      const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17 * s, 0.2 * s, 4, 12), shirtMat);
+      torso.position.y = 1.08 * s;
+      torso.scale.set(shoulderW, 1, 0.62 * belly);
       torso.castShadow = true; torso.receiveShadow = true;
       this.body.add(torso);
+      // 肩
+      const shoulders = new THREE.Mesh(new THREE.CapsuleGeometry(0.075 * s, 0.24 * s, 4, 10), shirtMat);
+      shoulders.rotation.z = Math.PI / 2;
+      shoulders.position.y = 1.3 * s;
+      shoulders.scale.set(1, 1, 0.72);
+      shoulders.castShadow = true;
+      this.body.add(shoulders);
+      // 胯
+      const hips = new THREE.Mesh(new THREE.CapsuleGeometry(0.14 * s, 0.06 * s, 4, 10), pantsMat);
+      hips.rotation.z = Math.PI / 2;
+      hips.position.y = 0.86 * s;
+      hips.scale.set(1, 1, 0.7);
+      this.body.add(hips);
+      // 衣领
+      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.086 * s, 0.022 * s, 6, 16), creamMat);
+      collar.rotation.x = Math.PI / 2;
+      collar.position.y = 1.365 * s;
+      this.body.add(collar);
+
       // 脖子 + 头
-      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * s, 0.06 * s, 0.08 * s, 8), skinMat);
-      neck.position.y = 1.37 * s; this.body.add(neck);
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.115 * s, 12, 10), skinMat);
-      head.position.y = 1.5 * s; head.scale.set(0.95, 1.08, 0.98);
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.055 * s, 0.07 * s, 0.1 * s, 8), skinMat);
+      neck.position.y = 1.4 * s; this.body.add(neck);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.12 * s, 16, 12), skinMat);
+      head.position.y = 1.54 * s; head.scale.set(0.92, 1.06, 0.96);
       head.castShadow = true;
       this.head = head;
       this.body.add(head);
+      // 耳朵
+      for (const sx of [-1, 1]) {
+        const ear = new THREE.Mesh(new THREE.SphereGeometry(0.028 * s, 8, 6), skinMat);
+        ear.position.set(sx * 0.11 * s, 1.54 * s, 0);
+        ear.scale.set(0.6, 1, 1);
+        this.body.add(ear);
+      }
+      // 鼻子
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.022 * s, 8, 6), skinMat);
+      nose.position.set(0, 1.525 * s, 0.115 * s);
+      nose.scale.set(0.8, 0.9, 1);
+      this.body.add(nose);
       // 头发
-      const hair = new THREE.Mesh(new THREE.SphereGeometry(0.118 * s, 12, 8, 0, TAU, 0, Math.PI * 0.62),
+      const hair = new THREE.Mesh(new THREE.SphereGeometry(0.125 * s, 14, 10, 0, TAU, 0, Math.PI * 0.6),
         new THREE.MeshStandardMaterial({ color: old ? 0x8a8a86 : 0x1f1c1a, roughness: 0.9 }));
-      hair.position.y = 1.51 * s;
+      hair.position.y = 1.55 * s;
       hair.rotation.x = rad(6);
       this.body.add(hair);
-      // 五官（简化：眼睛 + 嘴）
+      // 五官（眼睛 + 眉毛 + 嘴）
       const eyeMat = new THREE.MeshStandardMaterial({ color: 0x201c18, roughness: 0.6 });
+      const browMat = new THREE.MeshStandardMaterial({ color: 0x2a2320, roughness: 0.9 });
       for (const sx of [-1, 1]) {
-        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.016 * s, 6, 5), eyeMat);
-        eye.position.set(sx * 0.042 * s, 1.52 * s, 0.105 * s);
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018 * s, 8, 6), eyeMat);
+        eye.position.set(sx * 0.044 * s, 1.555 * s, 0.108 * s);
         this.body.add(eye);
+        const brow = new THREE.Mesh(new THREE.BoxGeometry(0.05 * s, 0.01 * s, 0.012 * s), browMat);
+        brow.position.set(sx * 0.045 * s, 1.585 * s, 0.112 * s);
+        brow.rotation.z = sx * rad(6);
+        this.body.add(brow);
       }
       const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.045 * s, 0.012 * s, 0.01 * s),
         new THREE.MeshStandardMaterial({ color: 0x7a3a30, roughness: 0.8 }));
-      mouth.position.set(0, 1.455 * s, 0.108 * s);
+      mouth.position.set(0, 1.49 * s, 0.11 * s);
       this.body.add(mouth);
 
-      // 手臂
+      // 手臂（两段胶囊 + 圆手）
       this.arms = [];
       for (const sx of [-1, 1]) {
         const arm = new THREE.Group();
-        const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.048 * s, 0.042 * s, 0.42 * s, 7), shirtMat);
-        upper.position.y = -0.21 * s; upper.castShadow = true;
+        const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.046 * s, 0.18 * s, 4, 10), shirtMat);
+        upper.position.y = -0.12 * s; upper.castShadow = true;
         arm.add(upper);
-        const hand = new THREE.Mesh(new THREE.SphereGeometry(0.045 * s, 8, 6), skinMat);
-        hand.position.y = -0.44 * s;
+        const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.04 * s, 0.16 * s, 4, 10), shortSleeve ? skinMat : shirtMat);
+        forearm.position.y = -0.34 * s; forearm.castShadow = true;
+        arm.add(forearm);
+        const hand = new THREE.Mesh(new THREE.SphereGeometry(0.044 * s, 8, 6), skinMat);
+        hand.position.y = -0.475 * s; hand.scale.set(1, 1.15, 0.72);
         arm.add(hand);
-        arm.position.set(sx * 0.215 * s, 1.3 * s, 0);
-        arm.rotation.z = sx * rad(6);
+        arm.position.set(sx * 0.20 * s * shoulderW, 1.32 * s, 0);
+        arm.rotation.z = sx * rad(5);
         this.body.add(arm);
         this.arms.push(arm);
       }
-      // 腿
+      // 腿（两段胶囊 + 圆头鞋）
       this.legs = [];
       for (const sx of [-1, 1]) {
         const leg = new THREE.Group();
-        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.062 * s, 0.052 * s, 0.5 * s, 7), pantsMat);
-        thigh.position.y = -0.25 * s; thigh.castShadow = true;
+        const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.072 * s, 0.30 * s, 4, 10), pantsMat);
+        thigh.position.y = -0.22 * s; thigh.castShadow = true;
         leg.add(thigh);
-        const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.052 * s, 0.046 * s, 0.44 * s, 7), pantsMat);
-        shin.position.y = -0.72 * s;
+        const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.055 * s, 0.32 * s, 4, 10), pantsMat);
+        shin.position.y = -0.66 * s;
         leg.add(shin);
-        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.1 * s, 0.06 * s, 0.2 * s), shoeMat);
-        shoe.position.set(0, -0.96 * s, 0.02 * s);
+        const shoe = new THREE.Mesh(new THREE.CapsuleGeometry(0.05 * s, 0.12 * s, 4, 8), shoeMat);
+        shoe.rotation.x = Math.PI / 2;
+        shoe.position.set(0, -0.93 * s, 0.035 * s);
+        shoe.scale.set(1, 1, 0.82);
         leg.add(shoe);
-        leg.position.set(sx * 0.1 * s, 1.0 * s, 0);
+        leg.position.set(sx * 0.09 * s, 1.0 * s, 0);
         this.body.add(leg);
         this.legs.push(leg);
       }

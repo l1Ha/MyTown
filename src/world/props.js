@@ -555,34 +555,54 @@
     }
   }
 
+  const EYE_MAT = new THREE.MeshStandardMaterial({ color: 0x17120e, roughness: 0.45 });
+  function legCap(rad2, len, mat) { return new THREE.Mesh(new THREE.CapsuleGeometry(rad2, len, 3, 8), mat); }
+
   P.chicken = function (rng) { // 鸡
     const m = M(), g = P.g();
     const r = rng || new MT.RNG(1);
     const white = r.chance(0.6);
     const bodyMat = new THREE.MeshStandardMaterial({ color: white ? 0xf2ece0 : 0xc8873c, roughness: 0.9 });
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), bodyMat);
-    body.scale.set(1.25, 1.0, 1.0); body.position.y = 0.26; body.castShadow = true;
-    g.add(body);
-    const neck = B().cyl(0.05, 0.07, 0.16, bodyMat, 8);
-    neck.position.set(0.19, 0.38, 0); neck.rotation.z = rad(-28); g.add(neck);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), bodyMat);
-    head.position.set(0.25, 0.46, 0); g.add(head);
-    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.08, 6), m.yellow);
-    beak.rotation.z = rad(-90); beak.position.set(0.32, 0.45, 0); g.add(beak);
-    const comb = B().box(0.05, 0.06, 0.02, m.red, 0.2);
-    comb.position.set(0.26, 0.53, 0); g.add(comb);
-    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.2, 6), bodyMat);
-    tail.rotation.z = rad(70); tail.position.set(-0.2, 0.36, 0); g.add(tail);
+    const combMat = new THREE.MeshStandardMaterial({ color: 0xc8342a, roughness: 0.7 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 11), bodyMat);
+    body.scale.set(1.3, 1.0, 1.0); body.position.y = 0.27; body.castShadow = true; g.add(body);
+    // 翅膀
     for (const sz of [-1, 1]) {
-      const leg = B().cyl(0.012, 0.012, 0.18, m.yellow, 5);
-      leg.position.set(0.02, 0.09, sz * 0.05); g.add(leg);
+      const wing = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), bodyMat);
+      wing.scale.set(1.2, 0.72, 0.34); wing.position.set(-0.02, 0.3, sz * 0.13);
+      wing.rotation.y = sz * rad(8); g.add(wing);
     }
-    const head0 = head.position.clone(), neckObj = neck;
+    const neck = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.1, 3, 9), bodyMat);
+    neck.position.set(0.19, 0.4, 0); neck.rotation.z = rad(-30); g.add(neck);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.072, 12, 9), bodyMat);
+    head.position.set(0.26, 0.48, 0); g.add(head);
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.026, 0.09, 6), m.yellow);
+    beak.rotation.z = rad(-90); beak.position.set(0.33, 0.47, 0); g.add(beak);
+    const comb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), combMat);
+    comb.scale.set(1.7, 0.9, 0.5); comb.position.set(0.26, 0.55, 0); g.add(comb);
+    const wattle = new THREE.Mesh(new THREE.SphereGeometry(0.016, 6, 5), combMat);
+    wattle.position.set(0.3, 0.44, 0); g.add(wattle);
+    for (const sz of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 5), EYE_MAT);
+      eye.position.set(0.3, 0.5, sz * 0.035); g.add(eye);
+    }
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.24, 7), bodyMat);
+    tail.rotation.z = rad(64); tail.position.set(-0.2, 0.38, 0); tail.scale.set(1, 1, 0.5); g.add(tail);
+    for (const sz of [-1, 1]) {
+      const feather = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 5), bodyMat);
+      feather.rotation.z = rad(74); feather.rotation.y = sz * rad(18);
+      feather.position.set(-0.2, 0.36, sz * 0.045); g.add(feather);
+      const leg = legCap(0.013, 0.13, m.yellow);
+      leg.position.set(0.02, 0.1, sz * 0.05); g.add(leg);
+      const foot = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), m.yellow);
+      foot.scale.set(1.5, 0.35, 1.0); foot.position.set(0.05, 0.012, sz * 0.05); g.add(foot);
+    }
+    const head0 = head.position.clone();
     anim(g, (t, dt, self) => {
       const peck = Math.sin(t * 1.4 + self.position.x * 2.1);
       const k = Math.max(0, peck) * 0.5;
-      head.position.set(0.25 + k * 0.06, 0.46 - k * 0.22, head0.z);
-      neck.position.y = 0.38 - k * 0.11;
+      head.position.set(0.26 + k * 0.06, 0.48 - k * 0.22, head0.z);
+      neck.position.y = 0.4 - k * 0.11;
       self.rotation.z = Math.sin(t * 2.2 + self.position.z) * 0.03;
     });
     return prop(g);
@@ -591,19 +611,29 @@
   P.duck = function (rng) { // 鸭
     const m = M(), g = P.g();
     const white = new THREE.MeshStandardMaterial({ color: 0xf6f4ec, roughness: 0.85 });
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), white);
-    body.scale.set(1.5, 0.85, 1.0); body.position.y = 0.2; body.castShadow = true; g.add(body);
-    const neck = B().cyl(0.04, 0.06, 0.2, white, 8);
-    neck.position.set(0.2, 0.33, 0); neck.rotation.z = rad(-20); g.add(neck);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 6), white);
-    head.position.set(0.25, 0.43, 0); g.add(head);
-    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.1, 6), m.yellow);
-    beak.rotation.z = rad(-95); beak.scale.set(1, 1, 0.6); beak.position.set(0.34, 0.42, 0); g.add(beak);
-    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.16, 6), white);
-    tail.rotation.z = rad(80); tail.position.set(-0.26, 0.26, 0); g.add(tail);
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 11), white);
+    body.scale.set(1.5, 0.88, 1.0); body.position.y = 0.2; body.castShadow = true; g.add(body);
     for (const sz of [-1, 1]) {
-      const leg = B().cyl(0.012, 0.012, 0.12, m.yellow, 5);
+      const wing = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), white);
+      wing.scale.set(1.25, 0.7, 0.35); wing.position.set(0, 0.22, sz * 0.13); g.add(wing);
+    }
+    const neck = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.13, 3, 9), white);
+    neck.position.set(0.2, 0.34, 0); neck.rotation.z = rad(-22); g.add(neck);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.068, 12, 9), white);
+    head.position.set(0.25, 0.44, 0); g.add(head);
+    const bill = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), m.yellow);
+    bill.scale.set(1.8, 0.7, 1.0); bill.position.set(0.33, 0.43, 0); g.add(bill);
+    for (const sz of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 5), EYE_MAT);
+      eye.position.set(0.29, 0.46, sz * 0.035); g.add(eye);
+    }
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.16, 6), white);
+    tail.rotation.z = rad(80); tail.position.set(-0.26, 0.26, 0); tail.scale.set(1, 1, 0.7); g.add(tail);
+    for (const sz of [-1, 1]) {
+      const leg = legCap(0.012, 0.1, m.yellow);
       leg.position.set(0.0, 0.06, sz * 0.05); g.add(leg);
+      const foot = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), m.yellow);
+      foot.scale.set(1.2, 0.3, 1.6); foot.position.set(0.03, 0.01, sz * 0.05); g.add(foot);
     }
     anim(g, (t, dt, self) => { self.rotation.z = Math.sin(t * 1.6 + self.position.x) * 0.05; });
     return prop(g);
@@ -612,27 +642,38 @@
   P.dog = function () { // 狗
     const m = M(), g = P.g();
     const fur = new THREE.MeshStandardMaterial({ color: 0x8a6a44, roughness: 0.95 });
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), fur);
+    const fur2 = new THREE.MeshStandardMaterial({ color: 0xa5835a, roughness: 0.95 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), fur);
     body.scale.set(1.7, 0.95, 1.0); body.position.y = 0.42; body.castShadow = true; g.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), fur);
-    head.position.set(0.34, 0.6, 0); g.add(head);
-    const snout = B().box(0.16, 0.1, 0.11, fur, 0.3);
-    snout.position.set(0.46, 0.56, 0); g.add(snout);
-    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), m.metalDark);
-    nose.position.set(0.54, 0.57, 0); g.add(nose);
+    const chest = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), fur2);
+    chest.scale.set(0.9, 1.0, 0.95); chest.position.set(0.22, 0.42, 0); g.add(chest);
+    const neck = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.1, 3, 9), fur);
+    neck.position.set(0.3, 0.55, 0); neck.rotation.z = rad(-40); g.add(neck);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.135, 12, 10), fur);
+    head.position.set(0.4, 0.63, 0); g.add(head);
+    const snout = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), fur2);
+    snout.scale.set(1.5, 0.8, 0.85); snout.position.set(0.53, 0.6, 0); g.add(snout);
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 6), m.metalDark);
+    nose.position.set(0.61, 0.62, 0); g.add(nose);
     for (const sz of [-1, 1]) {
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.1, 5), fur);
-      ear.position.set(0.3, 0.73, sz * 0.07); ear.rotation.z = sz * rad(10); g.add(ear);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), EYE_MAT);
+      eye.position.set(0.49, 0.67, sz * 0.06); g.add(eye);
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), fur);
+      ear.scale.set(0.7, 1.1, 0.5); ear.position.set(0.35, 0.75, sz * 0.085);
+      ear.rotation.z = sz * rad(-14); g.add(ear);
     }
-    const tail = B().cyl(0.03, 0.02, 0.28, fur, 6);
-    tail.position.set(-0.34, 0.52, 0); tail.rotation.z = rad(-50); g.add(tail);
-    for (const sx of [0.14, -0.14]) for (const sz of [-1, 1]) {
-      const leg = B().cyl(0.035, 0.03, 0.32, fur, 6);
-      leg.position.set(sx, 0.16, sz * 0.1); g.add(leg);
+    const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.028, 0.22, 3, 8), fur);
+    tail.position.set(-0.34, 0.52, 0); tail.rotation.z = rad(-55); g.add(tail);
+    for (const sx of [0.16, -0.16]) for (const sz of [-1, 1]) {
+      const leg = legCap(0.036, 0.24, fur);
+      leg.position.set(sx, 0.17, sz * 0.1); g.add(leg);
+      const paw = new THREE.Mesh(new THREE.SphereGeometry(0.042, 8, 6), fur2);
+      paw.scale.set(1.0, 0.6, 1.3); paw.position.set(sx, 0.035, sz * 0.1 + 0.02); g.add(paw);
     }
     anim(g, (t, dt, self) => {
       tail.rotation.y = Math.sin(t * 8 + self.position.x) * 0.7;
-      head.position.y = 0.6 + Math.sin(t * 2.5) * 0.012;
+      tail.rotation.x = Math.sin(t * 8 + self.position.x) * 0.2;
+      head.position.y = 0.63 + Math.sin(t * 2.5) * 0.012;
     });
     return prop(g);
   };
@@ -640,56 +681,67 @@
   P.pig = function () { // 猪
     const m = M(), g = P.g();
     const skin = new THREE.MeshStandardMaterial({ color: 0xe3b3a4, roughness: 0.9 });
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), skin);
+    const skinD = new THREE.MeshStandardMaterial({ color: 0xd6a091, roughness: 0.9 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.34, 14, 11), skin);
     body.scale.set(1.5, 1.0, 1.05); body.position.y = 0.5; body.castShadow = true; g.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), skin);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), skin);
     head.position.set(0.5, 0.48, 0); g.add(head);
-    const snout = B().cyl(0.1, 0.09, 0.12, skin, 10);
-    snout.rotation.z = Math.PI / 2; snout.position.set(0.7, 0.45, 0); g.add(snout);
+    const snout = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.09, 0.12, 12), skinD);
+    snout.rotation.z = Math.PI / 2; snout.position.set(0.71, 0.45, 0); g.add(snout);
     for (const sz of [-1, 1]) {
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.14, 5), skin);
-      ear.position.set(0.44, 0.66, sz * 0.13); ear.rotation.z = sz * rad(-25); g.add(ear);
+      const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.014, 6, 5), m.metalDark);
+      nostril.position.set(0.775, 0.45, sz * 0.035); g.add(nostril);
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.15, 6), skinD);
+      ear.position.set(0.44, 0.66, sz * 0.14); ear.rotation.z = sz * rad(-28); g.add(ear);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 5), EYE_MAT);
+      eye.position.set(0.62, 0.54, sz * 0.1); g.add(eye);
     }
-    const tail = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.018, 5, 10), skin);
-    tail.position.set(-0.52, 0.6, 0); g.add(tail);
+    const tail = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.016, 5, 12, Math.PI * 1.6), skin);
+    tail.position.set(-0.52, 0.6, 0); tail.rotation.y = Math.PI / 2; g.add(tail);
     for (const sx of [0.24, -0.24]) for (const sz of [-1, 1]) {
-      const leg = B().cyl(0.055, 0.05, 0.34, skin, 7);
-      leg.position.set(sx, 0.17, sz * 0.18); g.add(leg);
+      const leg = legCap(0.055, 0.2, skin);
+      leg.position.set(sx, 0.18, sz * 0.18); g.add(leg);
+      const hoof = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), skinD);
+      hoof.scale.set(1, 0.6, 1.1); hoof.position.set(sx, 0.035, sz * 0.18); g.add(hoof);
     }
-    anim(g, (t, dt, self) => {
-      tail.rotation.z = Math.sin(t * 4) * 0.4;
-      self.rotation.y += dt * 0.0;
-    });
+    anim(g, (t, dt, self) => { tail.rotation.z = Math.sin(t * 4) * 0.4; });
     return prop(g);
   };
 
   P.buffalo = function () { // 水牛
     const m = M(), g = P.g();
     const skin = new THREE.MeshStandardMaterial({ color: 0x4b4740, roughness: 0.95 });
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.62, 12, 10), skin);
-    body.scale.set(1.6, 0.95, 1.0); body.position.y = 1.15; body.castShadow = true; g.add(body);
-    const neck = B().cyl(0.3, 0.38, 0.5, skin, 10);
+    const skinD = new THREE.MeshStandardMaterial({ color: 0x3c3833, roughness: 0.95 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.62, 14, 11), skin);
+    body.scale.set(1.6, 0.98, 1.0); body.position.y = 1.15; body.castShadow = true; g.add(body);
+    const hump = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), skin);
+    hump.scale.set(1.0, 0.7, 0.8); hump.position.set(0.5, 1.62, 0); g.add(hump);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.38, 0.5, 12), skin);
     neck.position.set(0.85, 1.3, 0); neck.rotation.z = rad(-55); g.add(neck);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), skin);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), skin);
     head.scale.set(1.35, 0.9, 0.85); head.position.set(1.15, 1.45, 0); g.add(head);
-    const muzzle = B().cyl(0.16, 0.14, 0.22, skin, 10);
+    const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.14, 0.22, 12), skinD);
     muzzle.rotation.z = Math.PI / 2; muzzle.position.set(1.46, 1.4, 0); g.add(muzzle);
     for (const sz of [-1, 1]) {
-      const horn = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.045, 6, 12, Math.PI * 1.1), new THREE.MeshStandardMaterial({ color: 0xd8d0bc, roughness: 0.6 }));
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), EYE_MAT);
+      eye.position.set(1.32, 1.5, sz * 0.17); g.add(eye);
+      const horn = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.045, 6, 14, Math.PI * 1.1), new THREE.MeshStandardMaterial({ color: 0xd8d0bc, roughness: 0.6 }));
       horn.position.set(1.1, 1.62, sz * 0.2);
       horn.rotation.set(Math.PI / 2, 0, sz * rad(30));
       g.add(horn);
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.2, 5), skin);
-      ear.position.set(1.0, 1.5, sz * 0.32); ear.rotation.x = sz * rad(60); g.add(ear);
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), skin);
+      ear.scale.set(1.0, 0.5, 1.5); ear.position.set(1.0, 1.52, sz * 0.34); g.add(ear);
     }
     for (const sx of [0.6, -0.6]) for (const sz of [-1, 1]) {
-      const leg = B().cyl(0.11, 0.1, 1.0, skin, 8);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.1, 1.0, 9), skin);
       leg.position.set(sx, 0.5, sz * 0.34); g.add(leg);
-      const hoof = B().cyl(0.12, 0.12, 0.1, m.metalDark, 8);
+      const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.1, 9), skinD);
       hoof.position.set(sx, 0.05, sz * 0.34); g.add(hoof);
     }
-    const tail = B().cyl(0.04, 0.02, 0.8, skin, 6);
+    const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.6, 3, 7), skin);
     tail.position.set(-0.97, 1.0, 0); tail.rotation.z = rad(-16); g.add(tail);
+    const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), skinD);
+    tuft.scale.set(0.7, 1.8, 0.7); tuft.position.set(-1.05, 0.66, 0); g.add(tuft);
     anim(g, (t, dt, self) => {
       tail.rotation.y = Math.sin(t * 2) * 0.5;
       head.position.y = 1.45 + Math.sin(t * 1.1) * 0.03;
@@ -700,19 +752,30 @@
   P.goat = function () { // 羊
     const m = M(), g = P.g();
     const wool = new THREE.MeshStandardMaterial({ color: 0xf0ece2, roughness: 1.0 });
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), wool);
+    const hoofMat = new THREE.MeshStandardMaterial({ color: 0x5a5248, roughness: 0.9 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 11), wool);
     body.scale.set(1.45, 1.0, 1.0); body.position.y = 0.62; body.castShadow = true; g.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), wool);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), wool);
     head.position.set(0.45, 0.72, 0); g.add(head);
-    const beard = B().cyl(0.04, 0.02, 0.16, wool, 6);
-    beard.position.set(0.5, 0.6, 0); g.add(beard);
+    const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshStandardMaterial({ color: 0xd8cfc0, roughness: 0.95 }));
+    muzzle.scale.set(1.2, 0.9, 0.9); muzzle.position.set(0.57, 0.69, 0); g.add(muzzle);
+    const beard = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.16, 6), wool);
+    beard.position.set(0.57, 0.6, 0); beard.rotation.z = rad(6); g.add(beard);
     for (const sz of [-1, 1]) {
-      const horn = B().cyl(0.03, 0.045, 0.2, new THREE.MeshStandardMaterial({ color: 0xb0a890, roughness: 0.6 }), 6);
-      horn.position.set(0.4, 0.86, sz * 0.08); horn.rotation.z = sz * rad(-20); g.add(horn);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.016, 6, 5), EYE_MAT);
+      eye.position.set(0.54, 0.74, sz * 0.07); g.add(eye);
+      const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.045, 0.22, 7), new THREE.MeshStandardMaterial({ color: 0xb0a890, roughness: 0.6 }));
+      horn.position.set(0.4, 0.87, sz * 0.08); horn.rotation.z = sz * rad(-22); g.add(horn);
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), wool);
+      ear.scale.set(1.0, 0.5, 1.6); ear.position.set(0.4, 0.76, sz * 0.15); g.add(ear);
     }
+    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), wool);
+    tail.scale.set(0.7, 1.3, 0.7); tail.position.set(-0.4, 0.72, 0); g.add(tail);
     for (const sx of [0.2, -0.2]) for (const sz of [-1, 1]) {
-      const leg = B().cyl(0.04, 0.035, 0.48, new THREE.MeshStandardMaterial({ color: 0x6a6055, roughness: 0.9 }), 6);
+      const leg = legCap(0.04, 0.4, new THREE.MeshStandardMaterial({ color: 0x6a6055, roughness: 0.9 }));
       leg.position.set(sx, 0.24, sz * 0.13); g.add(leg);
+      const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.05, 7), hoofMat);
+      hoof.position.set(sx, 0.025, sz * 0.13); g.add(hoof);
     }
     return prop(g);
   };
@@ -720,19 +783,28 @@
   P.cat = function () { // 猫（常在墙头）
     const m = M(), g = P.g();
     const fur = new THREE.MeshStandardMaterial({ color: 0x3a3530, roughness: 0.95 });
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), fur);
+    const fur2 = new THREE.MeshStandardMaterial({ color: 0x554e46, roughness: 0.95 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), fur);
     body.scale.set(1.7, 0.85, 0.9); body.position.y = 0.2; body.castShadow = true; g.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), fur);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), fur);
     head.position.set(0.26, 0.29, 0); g.add(head);
+    const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), fur2);
+    muzzle.scale.set(1.1, 0.8, 0.9); muzzle.position.set(0.33, 0.26, 0); g.add(muzzle);
     for (const sz of [-1, 1]) {
       const ear = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.08, 4), fur);
       ear.position.set(0.24, 0.4, sz * 0.06); g.add(ear);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.013, 6, 5), EYE_MAT);
+      eye.position.set(0.32, 0.32, sz * 0.05); g.add(eye);
     }
-    const tail = B().cyl(0.022, 0.015, 0.36, fur, 5);
-    tail.position.set(-0.36, 0.24, 0); tail.rotation.z = rad(-40); g.add(tail);
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 5), new THREE.MeshStandardMaterial({ color: 0xb87f7f, roughness: 0.6 }));
+    nose.position.set(0.37, 0.3, 0); g.add(nose);
+    const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.3, 3, 7), fur);
+    tail.position.set(-0.36, 0.26, 0); tail.rotation.z = rad(-45); g.add(tail);
     for (const sx of [0.1, -0.1]) for (const sz of [-1, 1]) {
-      const leg = B().cyl(0.025, 0.02, 0.16, fur, 5);
+      const leg = legCap(0.025, 0.11, fur);
       leg.position.set(sx, 0.08, sz * 0.06); g.add(leg);
+      const paw = new THREE.Mesh(new THREE.SphereGeometry(0.028, 6, 5), fur2);
+      paw.scale.set(1, 0.6, 1.3); paw.position.set(sx, 0.02, sz * 0.06 + 0.015); g.add(paw);
     }
     anim(g, (t, dt, self) => { tail.rotation.y = Math.sin(t * 3) * 0.8; });
     return prop(g);
