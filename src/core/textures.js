@@ -55,6 +55,59 @@
     return c;
   }
 
+  /* ---------------- 由颜色贴图推导法线贴图（凹凸） ----------------
+   * 对颜色贴图的明度做 Sobel 梯度，得到"看起来有起伏"的法线，
+   * 让砖缝、瓦垄、木纹、土面产生真实的高光/阴影。无外部资源。 */
+  function bumpNormal(key, strength) {
+    const ck = 'nrm:' + key;
+    if (cache[ck]) return cache[ck];
+    const src = cache[key];
+    if (!src || !src.image || !src.image.getContext) return null;
+    const w = src.image.width, h = src.image.height;
+    const sctx = src.image.getContext('2d');
+    let data;
+    try { data = sctx.getImageData(0, 0, w, h).data; } catch (e) { return null; }
+    const out = makeCanvas(w);
+    const octx = out.getContext('2d');
+    const oimg = octx.createImageData(w, h);
+    const od = oimg.data;
+    const str = strength === undefined ? 2.4 : strength;
+    const lum = (i) => (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+    for (let y = 0; y < h; y++) {
+      const yu = (y - 1 + h) % h, yd = (y + 1) % h;
+      for (let x = 0; x < w; x++) {
+        const xl = (x - 1 + w) % w, xr = (x + 1) % w;
+        const L = lum((y * w + xl) * 4), R = lum((y * w + xr) * 4);
+        const U = lum((yu * w + x) * 4), D = lum((yd * w + x) * 4);
+        const dx = (R - L) * str, dy = (D - U) * str;
+        const len = Math.hypot(dx, dy, 1);
+        const o = (y * w + x) * 4;
+        od[o] = (-dx / len * 0.5 + 0.5) * 255;
+        od[o + 1] = (-dy / len * 0.5 + 0.5) * 255;
+        od[o + 2] = (1 / len * 0.5 + 0.5) * 255;
+        od[o + 3] = 255;
+      }
+    }
+    octx.putImageData(oimg, 0, 0);
+    const t = new THREE.CanvasTexture(out);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.colorSpace = THREE.NoColorSpace;
+    t.anisotropy = aniso();
+    t.generateMipmaps = true;
+    cache[ck] = t;
+    return t;
+  }
+  /** 取（并按重复次数克隆）某张贴图的法线图 */
+  function nrm(key, repX, repY) {
+    const base = bumpNormal(key);
+    if (!base) return null;
+    const t = base.clone();
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(repX || 1, repY || 1);
+    t.needsUpdate = true;
+    return t;
+  }
+
   /* ---------------- 噪声小工具 ---------------- */
   function grain(ctx, size, amount, alpha) {
     const img = ctx.getImageData(0, 0, size, size);
@@ -842,29 +895,36 @@
       }, opts));
       return m;
     },
+    /* 带凹凸（法线）的贴图材质：颜色 + 由明度推导的法线图 */
+    bump(mapKey, rx, ry, rough, nscale) {
+      const m = M.std(cloneTex(mapKey, rx, ry), { roughness: rough });
+      const n = nrm(mapKey, rx, ry);
+      if (n) { m.normalMap = n; const s = nscale || 0.5; m.normalScale = new THREE.Vector2(s, s); }
+      return m;
+    },
     /* 注意：重复次数用两个数字传参，例如 MT.mat.tile(2, 2) */
     brickRed(rx = 1, ry = 1) {
-      const m = M.std(cloneTex('brickRed', rx, ry), { roughness: 0.95 });
+      const m = M.bump('brickRed', rx, ry, 0.95, 0.55);
       m.userData.baseMap = 'brickRed';
       return m;
     },
-    brickGrey(rx = 1, ry = 1) { return M.std(cloneTex('brickGrey', rx, ry), { roughness: 0.95 }); },
+    brickGrey(rx = 1, ry = 1) { return M.bump('brickGrey', rx, ry, 0.95, 0.55); },
     whitewash(rx = 1, ry = 1) { return M.std(cloneTex('whitewash', rx, ry), { roughness: 0.9 }); },
-    mud(rx = 1, ry = 1) { return M.std(cloneTex('mudWall', rx, ry), { roughness: 1.0 }); },
-    tile(rx = 1, ry = 1) { return M.std(cloneTex('roofTile', rx, ry), { roughness: 0.72 }); },
-    concrete(rx = 1, ry = 1) { return M.std(cloneTex('concrete', rx, ry), { roughness: 0.85 }); },
-    cement(rx = 1, ry = 1) { return M.std(cloneTex('cementRoad', rx, ry), { roughness: 0.88 }); },
-    dirt(rx = 1, ry = 1) { return M.std(cloneTex('dirtRoad', rx, ry), { roughness: 0.98 }); },
-    soil(rx = 1, ry = 1) { return M.std(cloneTex('soil', rx, ry), { roughness: 1.0 }); },
-    grass(rx = 1, ry = 1) { return M.std(cloneTex('grass', rx, ry), { roughness: 1.0 }); },
-    bark() { return M.std(cloneTex('bark', 1, 1), { roughness: 0.95 }); },
-    wood(rx = 1, ry = 1) { return M.std(cloneTex('wood', rx, ry), { roughness: 0.85 }); },
-    door() { return M.std(cloneTex('door', 1, 1), { roughness: 0.7 }); },
+    mud(rx = 1, ry = 1) { return M.bump('mudWall', rx, ry, 1.0, 0.7); },
+    tile(rx = 1, ry = 1) { return M.bump('roofTile', rx, ry, 0.7, 0.9); },
+    concrete(rx = 1, ry = 1) { return M.bump('concrete', rx, ry, 0.85, 0.3); },
+    cement(rx = 1, ry = 1) { return M.bump('cementRoad', rx, ry, 0.88, 0.3); },
+    dirt(rx = 1, ry = 1) { return M.bump('dirtRoad', rx, ry, 0.98, 0.5); },
+    soil(rx = 1, ry = 1) { return M.bump('soil', rx, ry, 1.0, 0.45); },
+    grass(rx = 1, ry = 1) { return M.bump('grass', rx, ry, 1.0, 0.45); },
+    bark() { return M.bump('bark', 1, 1, 0.95, 0.8); },
+    wood(rx = 1, ry = 1) { return M.bump('wood', rx, ry, 0.85, 0.45); },
+    door() { return M.bump('door', 1, 1, 0.7, 0.6); },
     window() {
       return M.std(cloneTex('window', 1, 1), { roughness: 0.18, metalness: 0.15, color: 0xffffff });
     },
-    straw() { return M.std(cloneTex('straw', 1, 1), { roughness: 1.0 }); },
-    vegBed(rx = 1, ry = 1) { return M.std(cloneTex('vegetableBed', rx, ry), { roughness: 1.0 }); },
+    straw() { return M.bump('straw', 1, 1, 1.0, 0.6); },
+    vegBed(rx = 1, ry = 1) { return M.bump('vegetableBed', rx, ry, 1.0, 0.4); },
     snow(rx = 1, ry = 1) { return M.std(cloneTex('snow', rx, ry), { roughness: 0.75 }); },
 
     /** 纯色材质 */
