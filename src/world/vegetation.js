@@ -65,6 +65,7 @@
       this.mesh.count = 0;
       this.items = [];
       this.dummy = new THREE.Object3D();
+      this.dummy.rotation.order = 'YXZ';   // 便于用 (tilt, yaw) 摆放树枝
       this.tmpC = new THREE.Color();
       this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       this.capacity = capacity;
@@ -78,9 +79,9 @@
       for (let i = 0; i < this.items.length; i++) {
         const it = this.items[i];
         this.dummy.position.set(it.x, it.y, it.z);
-        this.dummy.rotation.set(0, it.ry, 0);
+        this.dummy.rotation.set(it.rx || 0, it.ry, it.rz || 0);
         const s = it.s * (it.tintSize === undefined ? 1 : it.tintSize);
-        this.dummy.scale.set(s, s, s);
+        this.dummy.scale.set(s * (it.sx || 1), s * (it.sy || 1), s * (it.sz || 1));
         this.dummy.updateMatrix();
         this.mesh.setMatrixAt(i, this.dummy.matrix);
         this.mesh.setColorAt(i, this.tmpC.setRGB(1, 1, 1));
@@ -93,9 +94,9 @@
       for (let i = 0; i < this.items.length; i++) {
         const it = this.items[i];
         this.dummy.position.set(it.x, it.y, it.z);
-        this.dummy.rotation.set(0, it.ry, 0);
+        this.dummy.rotation.set(it.rx || 0, it.ry, it.rz || 0);
         const s = it.s * (sizeFn ? sizeFn(it) : 1);
-        this.dummy.scale.set(s, s, s);
+        this.dummy.scale.set(s * (it.sx || 1), s * (it.sy || 1), s * (it.sz || 1));
         this.dummy.updateMatrix();
         this.mesh.setMatrixAt(i, this.dummy.matrix);
         this.mesh.setColorAt(i, colorFn(it, this.tmpC));
@@ -243,10 +244,13 @@
       this._buildReeds();
       /* 9. 荷叶 */
       this._buildLotus();
+      /* 10. 灌木 / 野花 */
+      this._buildBushes();
+      this._buildFlowers();
     }
 
     _plant(placements, H) {
-      const m = MT.M();
+      const rng = this.rng;
       const byKey = {};
       const plots = MT.farmPlots || [];
       const inField = (x, z) => {
@@ -261,62 +265,94 @@
         if (inField(p.x, p.z)) continue;
         (byKey[p.key] = byKey[p.key] || []).push(p);
       }
-      const detail = this.quality === 'high' ? 1 : 0;
-      const leafMats = {
-        ico: new THREE.IcosahedronGeometry(1, detail),
-        cone: new THREE.ConeGeometry(1, 2.2, this.quality === 'high' ? 7 : 5, 2),
-      };
+      const hi = this.quality === 'high' || this.quality === 'ultra';
+      const blobDetail = this.quality === 'low' ? 0 : 1;
+      const blobMul = this.quality === 'low' ? 0.7 : this.quality === 'medium' ? 1.0 : 1.4;
+      const coneGeo = new THREE.ConeGeometry(1, 2.2, this.quality === 'low' ? 6 : 9, 3);
+      const trunkGeo = this._trunkGeo();
+      const branchGeo = new THREE.CylinderGeometry(0.32, 0.8, 1, 6, 1, true);
+      branchGeo.translate(0, 0.5, 0);
+
       for (const key in byKey) {
         const spec = SPECIES[key];
         if (!spec) continue;
         const list = byKey[key];
-        // 树干
-        const trunkGeo = new THREE.CylinderGeometry(1, 1.25, 1, 7, 1);
-        trunkGeo.translate(0, 0.5, 0);
-        const trunkMat = new THREE.MeshStandardMaterial({ color: spec.trunk, roughness: 0.95 });
+        // 树干 / 树枝（同一材质）
+        const barkTex = MT.texture.cloneTex('bark', 1, Math.max(2, Math.round(spec.h[1] * 0.45)));
+        const trunkMat = new THREE.MeshStandardMaterial({ color: spec.trunk, roughness: 0.95, map: barkTex || null });
         const trunkSet = new InstSet(trunkGeo, trunkMat, list.length, key + '_trunk');
+        const branchSet = new InstSet(branchGeo, trunkMat, list.length * 12, key + '_branch');
         // 树冠
-        const leafMat = new THREE.MeshStandardMaterial({
-          color: 0xffffff, roughness: 0.92, flatShading: true,
-        });
-        const leafSet = new InstSet(leafMats[spec.leafGeo].clone(), leafMat, list.length * spec.blobs, key + '_leaf');
+        const leafMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, flatShading: true });
+        const leafGeo = spec.leafGeo === 'cone' ? coneGeo : this._lumpyGeo(blobDetail, key.length * 7 + 3);
+        const cap = list.length * (Math.ceil(spec.blobs * blobMul) + 10);
+        const leafSet = new InstSet(leafGeo.clone(), leafMat, cap, key + '_leaf');
+
         for (const p of list) {
-          const h = lerp(spec.h[0], spec.h[1], this.rng.next()) * p.s;
-          const tr = lerp(spec.trunkR[0], spec.trunkR[1], this.rng.next()) * p.s;
+          const h = lerp(spec.h[0], spec.h[1], rng.next()) * p.s;
+          const tr = lerp(spec.trunkR[0], spec.trunkR[1], rng.next()) * p.s;
           const gy = H(p.x, p.z);
-          const d = this._trunkData(gy, h, tr, spec);
-          trunkSet.add({ x: p.x, y: gy, z: p.z }, this.rng.next() * TAU, 1, 1, 0);
-          trunkSet.items[trunkSet.items.length - 1].d = d;
-          // 树冠 blobs
-          const cr = lerp(spec.crownR[0], spec.crownR[1], this.rng.next()) * p.s;
-          const ch = lerp(spec.crownH[0], spec.crownH[1], this.rng.next()) * p.s;
-          for (let b = 0; b < spec.blobs; b++) {
-            const t = b / Math.max(1, spec.blobs - 1);
-            const br = cr * (0.72 - t * 0.3);
-            const bx = p.x + this.rng.range(-cr * 0.45, cr * 0.45);
-            const bz = p.z + this.rng.range(-cr * 0.45, cr * 0.45);
-            const by = gy + h * 0.62 + t * ch * 0.75 + this.rng.range(-0.3, 0.3);
-            if (spec.leafGeo === 'cone') {
-              leafSet.add({ x: bx, y: by, z: bz }, this.rng.next() * TAU, br * 0.85, 1, 0);
-            } else {
-              leafSet.add({ x: bx, y: by, z: bz }, this.rng.next() * TAU, br, 1, 0);
+          trunkSet.add({ x: p.x, y: gy, z: p.z }, rng.next() * TAU, 1, 1, 0);
+          trunkSet.items[trunkSet.items.length - 1].trunkS = { h, r: tr };
+
+          const cr = lerp(spec.crownR[0], spec.crownR[1], rng.next()) * p.s;
+          const ch = lerp(spec.crownH[0], spec.crownH[1], rng.next()) * p.s;
+          const baseY = gy + h * 0.6 + ch * 0.45;
+          const willow = !!spec.droop;
+
+          // 树枝：中上部向外分叉
+          if (spec.leafGeo !== 'cone') {
+            const nBr = Math.round((4 + spec.blobs) * (this.quality === 'low' ? 0.55 : 1));
+            for (let b = 0; b < nBr; b++) {
+              const az = rng.next() * TAU;
+              const bh = h * rng.range(0.42, 0.72);
+              const len = cr * rng.range(0.7, 1.15) + rng.range(1, 2.4);
+              const tilt = rng.range(50, 76) * Math.PI / 180;
+              branchSet.add({ x: p.x + Math.cos(az) * tr * 0.3, y: gy + bh, z: p.z + Math.sin(az) * tr * 0.3 }, az, 1, 1, 0);
+              const bit = branchSet.items[branchSet.items.length - 1];
+              bit.rx = tilt; bit.ry = az;
+              bit.sx = tr * rng.range(0.28, 0.44); bit.sz = bit.sx; bit.sy = len;
             }
           }
-          // 树干碰撞
+
+          // 树冠
+          if (spec.leafGeo === 'cone') {
+            const nB = Math.max(3, Math.round(spec.blobs * blobMul));
+            for (let b = 0; b < nB; b++) {
+              const t = b / Math.max(1, nB - 1);
+              leafSet.add({ x: p.x, y: gy + h * (0.3 + t * 0.72), z: p.z }, rng.next() * TAU, cr * (1.15 - t * 0.82), 1, 0);
+            }
+          } else {
+            const nB = Math.max(4, Math.round(spec.blobs * blobMul) + 2);
+            for (let b = 0; b < nB; b++) {
+              const az = rng.next() * TAU;
+              const rad = cr * Math.sqrt(rng.next()) * 0.92;
+              const bx = p.x + Math.cos(az) * rad, bz = p.z + Math.sin(az) * rad;
+              const by = baseY + rng.range(-0.5, 0.6) * ch * (willow ? 0.35 : 0.6);
+              const br = cr * rng.range(0.42, 0.72) * (willow ? 0.85 : 1);
+              leafSet.add({ x: bx, y: by, z: bz }, rng.next() * TAU, br, 1, 0);
+              const lit = leafSet.items[leafSet.items.length - 1];
+              lit.rx = rng.range(-0.3, 0.3); lit.rz = rng.range(-0.3, 0.3);
+              lit.sy = willow ? rng.range(0.7, 0.95) : rng.range(0.82, 1.05);
+              lit.sx = lit.sz = rng.range(0.92, 1.12);
+            }
+            // 垂柳：额外挂几团下垂叶簇
+            if (willow) {
+              for (let b = 0; b < 5; b++) {
+                const az = rng.next() * TAU, rad = cr * rng.range(0.5, 1.0);
+                leafSet.add({ x: p.x + Math.cos(az) * rad, y: gy + h * 0.6 + rng.range(-1.2, 0.4), z: p.z + Math.sin(az) * rad }, rng.next() * TAU, cr * rng.range(0.3, 0.45), 1, 0);
+                const lit = leafSet.items[leafSet.items.length - 1];
+                lit.sy = 0.6; lit.sx = lit.sz = 1.15;
+              }
+            }
+          }
+
           if (spec.collider || h > 7) {
-            MT.colliders.push({
-              x: p.x, y: gy + h * 0.5, z: p.z, hw: tr * 1.3, hh: h * 0.5, hd: tr * 1.3,
-              ry: 0, cos: 1, sin: 0, active: true,
-            });
+            MT.colliders.push({ x: p.x, y: gy + h * 0.5, z: p.z, hw: tr * 1.3, hh: h * 0.5, hd: tr * 1.3, ry: 0, cos: 1, sin: 0, active: true });
           }
         }
-        // 树干缩放（每棵不同）
-        for (const it of trunkSet.items) {
-          const d = it.d;
-          it.s = 1;
-          it.tintSize = 1;
-          it.trunkS = d;
-        }
+
+        // 树干矩阵（非均匀：半径 × 高度）
         trunkSet.mesh.count = trunkSet.items.length;
         const dm = trunkSet.dummy;
         for (let i = 0; i < trunkSet.items.length; i++) {
@@ -328,18 +364,50 @@
           trunkSet.mesh.setMatrixAt(i, dm.matrix);
         }
         trunkSet.mesh.instanceMatrix.needsUpdate = true;
-        leafSet.commit();   // 树冠 InstancedMesh 必须提交，否则 count 恒为 0 → 所有树叶不渲染
-        trunkSet.mesh.castShadow = true;
-        trunkSet.mesh.receiveShadow = true;
-        leafSet.mesh.castShadow = true;
-        leafSet.mesh.receiveShadow = true;
+        branchSet.commit();
+        leafSet.commit();
+        trunkSet.mesh.castShadow = true; trunkSet.mesh.receiveShadow = true;
+        branchSet.mesh.castShadow = true;
+        leafSet.mesh.castShadow = true; leafSet.mesh.receiveShadow = true;
         this.group.add(trunkSet.mesh);
+        this.group.add(branchSet.mesh);
         this.group.add(leafSet.mesh);
-        this.trees[key] = { trunk: trunkSet, leaf: leafSet, spec };
+        this.trees[key] = { trunk: trunkSet, branch: branchSet, leaf: leafSet, spec };
       }
     }
-    _trunkData(gy, h, tr, spec) {
-      return { h, r: tr };
+
+    /** 树干几何：单位高度 0..1，含根部外扩与向上收分 */
+    _trunkGeo() {
+      const geo = new THREE.CylinderGeometry(1, 1, 1, 9, 5, true);
+      const pos = geo.attributes.position;
+      const prof = (t) => {
+        if (t < 0.05) return 1.7 - (t / 0.05) * 0.65;
+        if (t < 0.3) return 1.05 - ((t - 0.05) / 0.25) * 0.3;
+        return 0.75 - ((t - 0.3) / 0.7) * 0.35;
+      };
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+        const t = y + 0.5, f = prof(clamp(t, 0, 1));
+        pos.setXYZ(i, x * f, t, z * f);
+      }
+      geo.computeVertexNormals();
+      return geo;
+    }
+
+    /** 不规则球：给树冠/灌木做"团块"感，而非光滑球 */
+    _lumpyGeo(detail, seed) {
+      const geo = new THREE.IcosahedronGeometry(1, detail);
+      const pos = geo.attributes.position;
+      const n = new MT.Noise(seed || 9);
+      const v = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        const d = n.fbm(v.x * 1.4 + 11, v.z * 1.4 + 7, 2);
+        v.multiplyScalar(1 + d * 0.2);
+        pos.setXYZ(i, v.x, v.y, v.z);
+      }
+      geo.computeVertexNormals();
+      return geo;
     }
 
     /* ---------- 草丛 ---------- */
@@ -458,6 +526,67 @@
       this.group.add(fset.mesh);
     }
 
+    /* ---------- 灌木丛 ---------- */
+    _buildBushes() {
+      const N = this.quality === 'low' ? 0 : this.quality === 'medium' ? 420 : 1200;
+      if (N === 0) return;
+      const r = this.rng, T = this.terrain;
+      const geo = this._lumpyGeo(this.quality === 'high' ? 1 : 0, 21);
+      const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1.0, flatShading: true });
+      const set = new InstSet(geo, mat, N, 'bush');
+      let tries = 0;
+      while (set.items.length < N && tries < N * 8) {
+        tries++;
+        const x = r.range(-240, 360), z = r.range(-200, 420);
+        if (T.waterDepth(x, z) > 0.02) continue;
+        const s = T.surfaceAt(x, z);
+        if (s === 'cement' || s === 'mud') continue;
+        if (T.slopeAt(x, z) > 0.55) continue;
+        if (MT.inBuildZone(x, z, -0.5)) continue;
+        if (r.chance(0.5)) continue;
+        set.add({ x, y: T.heightAt(x, z) + 0.1, z }, r.next() * TAU, r.range(0.5, 1.3), 1, 0);
+        const it = set.items[set.items.length - 1];
+        it.sy = r.range(0.6, 0.85); it.sx = it.sz = r.range(0.9, 1.2);
+      }
+      set.mesh.castShadow = true; set.mesh.receiveShadow = true;
+      set.commit();
+      this.bushSet = set;
+      this.group.add(set.mesh);
+    }
+
+    /* ---------- 野花（春 / 夏）---------- */
+    _buildFlowers() {
+      const N = this.quality === 'low' ? 0 : this.quality === 'medium' ? 700 : 1900;
+      if (N === 0) return;
+      const r = this.rng, T = this.terrain;
+      const geo = crossedGeo(0.5, 0.42, 2);
+      const mat = new THREE.MeshStandardMaterial({
+        map: MT.tex.flower(), alphaTest: 0.4, transparent: false,
+        side: THREE.DoubleSide, roughness: 1.0, color: 0xffffff,
+      });
+      const set = new InstSet(geo, mat, N, 'flower');
+      const palette = [new THREE.Color(0xf6d84a), new THREE.Color(0xf6f2e6), new THREE.Color(0xe89ab4), new THREE.Color(0xb79ae0), new THREE.Color(0xe6784a)];
+      let tries = 0;
+      while (set.items.length < N && tries < N * 8) {
+        tries++;
+        const x = r.range(-180, 340), z = r.range(-190, 400);
+        if (T.waterDepth(x, z) > 0.02) continue;
+        const s = T.surfaceAt(x, z);
+        if (s === 'cement' || s === 'mud') continue;
+        if (T.slopeAt(x, z) > 0.5) continue;
+        if (MT.inBuildZone(x, z, -1)) continue;
+        if (r.chance(0.6)) continue;
+        set.add({ x, y: T.heightAt(x, z) - 0.02, z }, r.next() * TAU, r.range(0.7, 1.4), 1, 0);
+        set.items[set.items.length - 1].col = palette[(r.next() * palette.length) | 0];
+      }
+      set.commit();
+      for (let i = 0; i < set.items.length; i++) set.mesh.setColorAt(i, set.items[i].col);
+      if (set.mesh.instanceColor) set.mesh.instanceColor.needsUpdate = true;
+      set.mesh.castShadow = false; set.mesh.receiveShadow = false;
+      this.flowerSet = set;
+      this.group.add(set.mesh);
+    }
+
     /* =========================================================
      *  标志树（村口大槐树 / 树下石凳）
      * ========================================================= */
@@ -474,8 +603,9 @@
       base.position.y = 0.3; g.add(base);
       // 主干
       const trunkMat = new THREE.MeshStandardMaterial({ color: spec.trunk, roughness: 1, map: MT.tex.bark() });
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(tr * 0.75, tr, H, 10, 3), trunkMat);
-      trunk.position.y = H / 2 + 0.5; trunk.castShadow = true; trunk.receiveShadow = true;
+      const trunk = new THREE.Mesh(this._trunkGeo(), trunkMat);
+      trunk.scale.set(tr, H, tr);
+      trunk.position.y = 0.4; trunk.castShadow = true; trunk.receiveShadow = true;
       g.add(trunk);
       // 侧枝
       for (let i = 0; i < 5; i++) {
@@ -490,11 +620,14 @@
       // 树冠（多个球）
       const leafMat = new THREE.MeshStandardMaterial({ color: 0x4f8a3a, roughness: 0.95, flatShading: true });
       const blobs = [];
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 14; i++) {
         const a = r.next() * TAU;
-        const d = Math.sqrt(r.next()) * 4.6;
-        const blob = new THREE.Mesh(new THREE.IcosahedronGeometry(r.range(2.0, 3.4), 1), leafMat);
-        blob.position.set(Math.cos(a) * d, H * 0.86 + r.range(-1.6, 2.0), Math.sin(a) * d);
+        const d = Math.sqrt(r.next()) * 4.8;
+        const sz = r.range(2.0, 3.5);
+        const bg = this._lumpyGeo(1, 40 + i);
+        bg.scale(sz * r.range(0.9, 1.15), sz * r.range(0.85, 1.05), sz * r.range(0.9, 1.15));
+        const blob = new THREE.Mesh(bg, leafMat);
+        blob.position.set(Math.cos(a) * d, H * 0.86 + r.range(-1.8, 2.2), Math.sin(a) * d);
         blob.castShadow = true; blob.receiveShadow = true;
         blobs.push(blob);
         g.add(blob);
@@ -572,6 +705,14 @@
       }
       if (this.lotusFlowers) {
         this.lotusFlowers.mesh.visible = season === 'summer' || season === 'spring';
+      }
+      if (this.bushSet) {
+        const bc = { spring: 0x8fbb5e, summer: 0x5f8f42, autumn: 0xb99a4e, winter: 0x7c7058 }[key] || 0x5f8f42;
+        const bcol = new THREE.Color(bc);
+        this.bushSet.applySeason((it, col) => col.copy(bcol).multiplyScalar(0.8 + ((it.ry * 53) % 1) * 0.4), (it) => (bare ? 0.8 : 1));
+      }
+      if (this.flowerSet) {
+        this.flowerSet.mesh.visible = (season === 'spring' || season === 'summer');
       }
       // 地标大树
       for (const g of this.landmarks) {

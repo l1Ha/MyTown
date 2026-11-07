@@ -858,6 +858,25 @@
       }
     }),
 
+    /* ---- 野花（透明底；花瓣近白，便于按实例着色）---- */
+    flower: () => tex('flower', qsize(128), (ctx, s) => {
+      baseFill(ctx, s, [238, 238, 228], 0.10);
+      const bloom = (x, y, r, a0) => {
+        for (let p = 0; p < 5; p++) {
+          const a = a0 + p / 5 * Math.PI * 2;
+          ctx.fillStyle = 'rgba(255,255,255,0.95)';
+          ctx.beginPath();
+          ctx.ellipse(x + Math.cos(a) * r * 0.6, y + Math.sin(a) * r * 0.6, r * 0.55, r * 0.4, a, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(255,240,190,0.95)';
+        ctx.beginPath(); ctx.arc(x, y, r * 0.32, 0, Math.PI * 2); ctx.fill();
+      };
+      for (let i = 0; i < 8; i++) {
+        bloom(s * (0.14 + Math.random() * 0.72), s * (0.16 + Math.random() * 0.72), s * (0.06 + Math.random() * 0.05), Math.random() * Math.PI);
+      }
+    }),
+
     /* ---- 水波（用于水面的简易法线贴图）---- */
     waterNormal: () => dataTex('waterNormal', qsize(512), (ctx, s) => {
       const n = new MT.Noise(31), n2 = new MT.Noise(77);
