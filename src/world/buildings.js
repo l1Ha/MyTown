@@ -86,6 +86,18 @@
     m.castShadow = true; m.receiveShadow = true;
     return m;
   };
+  /** 带"瓦垄"起伏的屋面（沿宽度方向正弦隆起），让屋顶有真实剪影而非平板 */
+  G.tileSlabGeo = function (w, h, wl, amp) {
+    const segX = Math.max(8, Math.round(w / Math.max(0.1, wl / 3)));
+    const geo = new THREE.PlaneGeometry(w, h, segX, 1);
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      pos.setZ(i, amp * Math.abs(Math.sin(Math.PI * x / wl)));
+    }
+    geo.computeVertexNormals();
+    return geo;
+  };
   G.cyl = function (rt, rb, h, mat, seg) {
     const g = new THREE.CylinderGeometry(rt, rb, h, seg || 12, 1);
     const m = new THREE.Mesh(g, mat);
@@ -216,7 +228,12 @@
     const tile = opts.tile || 1.6;
 
     const mkSlab = (sign) => {
-      const mesh = G.plane(slabW, len, tileMat, slabW / tile, len / tile);
+      const wl = opts.wavelength || 0.3;
+      const amp = opts.tileAmp === undefined ? 0.055 : opts.tileAmp;
+      const geo = G.tileSlabGeo(slabW, len, wl, amp);
+      const uv = geo.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (slabW / tile), uv.getY(i) * (len / tile));
+      const mesh = new THREE.Mesh(geo, tileMat);
       mesh.rotation.x = -Math.PI / 2 + sign * a;
       mesh.position.set(0, wallH + rise - (len / 2) * Math.sin(a), sign * (len / 2) * Math.cos(a));
       mesh.castShadow = true; mesh.receiveShadow = true;
