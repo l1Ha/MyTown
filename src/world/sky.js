@@ -97,12 +97,14 @@
       this.sun.position.set(50, 80, 40);
       this.sun.castShadow = true;
       const sh = this.sun.shadow;
-      sh.mapSize.set(this.quality === 'low' ? 1024 : 2048, this.quality === 'low' ? 1024 : 2048);
-      const S = 118;   // 阴影相机跟随玩家，范围可以小一些，影子更清晰
+      const shadowRes = this.quality === 'ultra' ? 4096 : this.quality === 'high' ? 2048 : 1024;
+      sh.mapSize.set(shadowRes, shadowRes);
+      const S = 118;   // 阴影相机跟随玩家；改完正交相机一定要重算投影矩阵，否则仍是默认 ±5m
       sh.camera.left = -S; sh.camera.right = S; sh.camera.top = S; sh.camera.bottom = -S;
-      sh.camera.near = 1; sh.camera.far = 420;
-      sh.bias = -0.0006;
-      sh.normalBias = 0.05;
+      sh.camera.near = 1; sh.camera.far = 460;
+      sh.camera.updateProjectionMatrix();
+      sh.bias = -0.0005;
+      sh.normalBias = 0.06;
       scene.add(this.sun);
       this.sunTarget = new THREE.Object3D();
       scene.add(this.sunTarget);

@@ -71,15 +71,22 @@
     const octx = out.getContext('2d');
     const oimg = octx.createImageData(w, h);
     const od = oimg.data;
-    const str = strength === undefined ? 2.4 : strength;
-    const lum = (i) => (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+    const str = strength === undefined ? 2.6 : strength;
+    // 砖墙：砂浆比砖亮，把高度反相才能让"砖凸、缝凹"
+    const inv = (key === 'brickRed' || key === 'brickGrey') ? -1 : 1;
+    const L0 = (i) => (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
     for (let y = 0; y < h; y++) {
       const yu = (y - 1 + h) % h, yd = (y + 1) % h;
+      const yu3 = (y - 3 + h) % h, yd3 = (y + 3) % h;
       for (let x = 0; x < w; x++) {
         const xl = (x - 1 + w) % w, xr = (x + 1) % w;
-        const L = lum((y * w + xl) * 4), R = lum((y * w + xr) * 4);
-        const U = lum((yu * w + x) * 4), D = lum((yd * w + x) * 4);
-        const dx = (R - L) * str, dy = (D - U) * str;
+        const xl3 = (x - 3 + w) % w, xr3 = (x + 3) % w;
+        const fineX = (L0((y * w + xr) * 4) - L0((y * w + xl) * 4));
+        const fineY = (L0((yd * w + x) * 4) - L0((yu * w + x) * 4));
+        const coarseX = (L0((y * w + xr3) * 4) - L0((y * w + xl3) * 4));
+        const coarseY = (L0((yd3 * w + x) * 4) - L0((yu3 * w + x) * 4));
+        const dx = (fineX + 0.5 * coarseX) * str * inv;
+        const dy = (fineY + 0.5 * coarseY) * str * inv;
         const len = Math.hypot(dx, dy, 1);
         const o = (y * w + x) * 4;
         od[o] = (-dx / len * 0.5 + 0.5) * 255;
@@ -101,6 +108,54 @@
   function nrm(key, repX, repY) {
     const base = bumpNormal(key);
     if (!base) return null;
+    const t = base.clone();
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(repX || 1, repY || 1);
+    t.needsUpdate = true;
+    return t;
+  }
+
+  /** 由颜色贴图推导"粗糙度"贴图（低频）：越暗/越脏的地方越粗糙，干湿/苔痕反光不同 */
+  function roughMap(key, repX, repY) {
+    const ck = 'rgh:' + key;
+    let base = cache[ck];
+    if (!base) {
+      const src = cache[key];
+      if (!src || !src.image || !src.image.getContext) return null;
+      const w = src.image.width, h = src.image.height;
+      const n = Math.max(64, Math.round(w / 4));   // 粗糙度低频，1/4 分辨率足够
+      const sctx = src.image.getContext('2d');
+      let data;
+      try { data = sctx.getImageData(0, 0, w, h).data; } catch (e) { return null; }
+      const cv = makeCanvas(n);
+      const ctx = cv.getContext('2d');
+      const img = ctx.createImageData(n, n);
+      const od = img.data;
+      const L0 = (i) => (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+      const step = w / n;
+      for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) {
+          let s = 0, c = 0;
+          const sx = Math.floor(x * step), sy = Math.floor(y * step);
+          for (let j = 0; j < step; j += 2) {
+            for (let i = 0; i < step; i += 2) {
+              const px = (sx + i) % w, py = (sy + j) % h;
+              s += L0((py * w + px) * 4); c++;
+            }
+          }
+          const l = c ? s / c : 0.5;
+          const r = clamp(0.6 + (1 - l) * 0.4, 0, 1) * 255;   // 越暗越粗糙
+          const o = (y * n + x) * 4;
+          od[o] = od[o + 1] = od[o + 2] = r; od[o + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      base = new THREE.CanvasTexture(cv);
+      base.wrapS = base.wrapT = THREE.RepeatWrapping;
+      base.colorSpace = THREE.NoColorSpace;
+      base.anisotropy = aniso();
+      cache[ck] = base;
+    }
     const t = base.clone();
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.repeat.set(repX || 1, repY || 1);
@@ -139,7 +194,7 @@
     const f = s >= 0.99 ? 1 : s >= 0.7 ? 0.5 : 0.25;
     return Math.max(64, Math.round(base * f));
   }
-  function aniso() { return Math.min(MT.maxAniso || 4, 8); }
+  function aniso() { return Math.min(MT.maxAniso || 4, 16); }
 
   /** 小尺寸 fbm 噪声画布（会被放大成柔和的斑驳） */
   function noiseCanvas(n, seed, oct) {
@@ -330,7 +385,7 @@
     }),
 
     /* ---- 水泥屋面 / 平顶 ---- */
-    concrete: () => tex('concrete', qsize(512), (ctx, s) => {
+    concrete: () => tex('concrete', qsize(1024), (ctx, s) => {
       ctx.fillStyle = '#aaa59b'; ctx.fillRect(0, 0, s, s);
       splotch(ctx, s, 130, 12, 80, () => ['rgba(150,146,136,0.32)', 'rgba(150,146,136,0)']);
       splotch(ctx, s, 70, 6, 30, () => ['rgba(198,194,184,0.4)', 'rgba(198,194,184,0)']);
@@ -351,7 +406,7 @@
     }),
 
     /* ---- 水泥路面 / 打谷场 ---- */
-    cementRoad: () => tex('cementRoad', qsize(512), (ctx, s) => {
+    cementRoad: () => tex('cementRoad', qsize(1024), (ctx, s) => {
       ctx.fillStyle = '#b5b2aa'; ctx.fillRect(0, 0, s, s);
       grain(ctx, s, 26);
       splotch(ctx, s, 100, 10, 60, () => ['rgba(146,142,132,0.3)', 'rgba(146,142,132,0)']);
@@ -366,7 +421,7 @@
     }),
 
     /* ---- 土路 ---- */
-    dirtRoad: () => tex('dirtRoad', qsize(512), (ctx, s) => {
+    dirtRoad: () => tex('dirtRoad', qsize(1024), (ctx, s) => {
       ctx.fillStyle = '#a3906d'; ctx.fillRect(0, 0, s, s);
       splotch(ctx, s, 160, 8, 70, () => ['rgba(140,120,90,0.4)', 'rgba(140,120,90,0)']);
       splotch(ctx, s, 90, 6, 40, () => ['rgba(190,172,138,0.42)', 'rgba(190,172,138,0)']);
@@ -385,7 +440,7 @@
     }),
 
     /* ---- 田地土壤 ---- */
-    soil: () => tex('soil', qsize(512), (ctx, s) => {
+    soil: () => tex('soil', qsize(1024), (ctx, s) => {
       ctx.fillStyle = '#6d5a41'; ctx.fillRect(0, 0, s, s);
       splotch(ctx, s, 220, 6, 60, () => ['rgba(88,72,52,0.5)', 'rgba(88,72,52,0)']);
       splotch(ctx, s, 130, 5, 40, () => ['rgba(128,108,80,0.45)', 'rgba(128,108,80,0)']);
@@ -463,7 +518,7 @@
     }),
 
     /* ---- 木料 / 门板 ---- */
-    wood: () => tex('wood', qsize(512), (ctx, s) => {
+    wood: () => tex('wood', qsize(1024), (ctx, s) => {
       ctx.fillStyle = '#8a6a45'; ctx.fillRect(0, 0, s, s);
       mottle(ctx, s, { alpha: 0.14, seed: 17 });
       for (let i = 0; i < 160; i++) {
@@ -919,6 +974,8 @@
       const m = M.std(cloneTex(mapKey, rx, ry), { roughness: rough });
       const n = nrm(mapKey, rx, ry);
       if (n) { m.normalMap = n; const s = nscale || 0.5; m.normalScale = new THREE.Vector2(s, s); }
+      const rg = roughMap(mapKey, rx, ry);
+      if (rg) m.roughnessMap = rg;
       return m;
     },
     /* 注意：重复次数用两个数字传参，例如 MT.mat.tile(2, 2) */
