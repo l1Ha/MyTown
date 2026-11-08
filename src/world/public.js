@@ -25,38 +25,50 @@
     /** 长条几 + 八仙桌 + 太师椅（堂屋中堂） */
     hallSet() {
       const m = M(), o = g();
-      const table = g(); // 长条几
-      const top = B().box(2.1, 0.09, 0.42, m.woodDark, 0.8);
-      top.position.set(0, 0.86, 0); table.add(top);
+      const leg4 = (parent, h2, x, z, rt, rb) => { const l = B().cyl(rt, rb, h2, m.woodDark, 10); l.position.set(x, h2 / 2, z); parent.add(l); };
+      // 长条几（翘头案）：圆腿 + 牙板 + 横枨 + 足托
+      const table = g();
+      const top = B().box(2.1, 0.08, 0.44, m.woodDark, 0.8);
+      top.position.set(0, 0.88, 0); table.add(top);
+      for (const sz of [-1, 1]) { const ap = B().box(1.98, 0.12, 0.05, m.woodDark, 0.5); ap.position.set(0, 0.8, sz * 0.185); table.add(ap); }
       for (const sx of [-1, 1]) {
-        const leg = B().box(0.09, 0.84, 0.36, m.woodDark, 0.6);
-        leg.position.set(sx * 0.98, 0.42, 0); table.add(leg);
+        leg4(table, 0.84, sx * 0.96, 0.17, 0.055, 0.045);
+        leg4(table, 0.84, sx * 0.96, -0.17, 0.055, 0.045);
+        const foot = B().cyl(0.058, 0.07, 0.05, m.woodDark, 10); foot.position.set(sx * 0.96, 0.03, 0.17); table.add(foot);
+        const foot2 = foot.clone(); foot2.position.z = -0.17; table.add(foot2);
+        const str = B().box(0.04, 0.06, 0.32, m.woodDark, 0.4); str.position.set(sx * 0.96, 0.2, 0); table.add(str);
       }
       o.add(table);
-      // 八仙桌
+      // 八仙桌：牙板 + 横枨 + 圆腿 + 束腰
       const bt = g();
-      const btop = B().box(1.0, 0.07, 1.0, m.woodDark, 0.7);
-      btop.position.y = 0.78; bt.add(btop);
+      const btop = B().box(1.08, 0.06, 1.08, m.woodDark, 0.7); btop.position.y = 0.8; bt.add(btop);
+      const waist = B().box(1.0, 0.05, 1.0, m.woodDark, 0.5); waist.position.y = 0.76; bt.add(waist);
+      for (const sz of [-1, 1]) { const ap = B().box(0.98, 0.12, 0.06, m.woodDark, 0.5); ap.position.set(0, 0.7, sz * 0.48); bt.add(ap); }
+      for (const sx of [-1, 1]) { const ap = B().box(0.06, 0.12, 0.98, m.woodDark, 0.5); ap.position.set(sx * 0.48, 0.7, 0); bt.add(ap); }
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-        const leg = B().box(0.08, 0.76, 0.08, m.woodDark, 0.5);
-        leg.position.set(sx * 0.44, 0.38, sz * 0.44); bt.add(leg);
+        leg4(bt, 0.72, sx * 0.46, sz * 0.46, 0.05, 0.04);
+        const foot = B().cyl(0.055, 0.068, 0.05, m.woodDark, 10); foot.position.set(sx * 0.46, 0.025, sz * 0.46); bt.add(foot);
       }
-      bt.position.set(0, 0, 1.1);
+      for (const sz of [-1, 1]) { const st = B().box(0.88, 0.045, 0.045, m.woodDark, 0.4); st.position.set(0, 0.2, sz * 0.46); bt.add(st); }
+      for (const sx of [-1, 1]) { const st = B().box(0.045, 0.045, 0.88, m.woodDark, 0.4); st.position.set(sx * 0.46, 0.2, 0); bt.add(st); }
+      bt.position.set(0, 0, 1.15);
       o.add(bt);
-      // 太师椅 ×2
+      // 太师椅 ×2：卷书搭脑 + 靠背竖枨 + 扶手 + 踏枨
       for (const sx of [-1, 1]) {
         const ch = g();
-        const seat = B().box(0.52, 0.06, 0.48, m.woodDark, 0.5);
-        seat.position.y = 0.48; ch.add(seat);
-        const back = B().box(0.52, 0.62, 0.06, m.woodDark, 0.5);
-        back.position.set(0, 0.79, -0.21); ch.add(back);
-        for (const ax of [-1, 1]) for (const az of [-1, 1]) {
-          const leg = B().box(0.05, 0.48, 0.05, m.woodDark, 0.4);
-          leg.position.set(ax * 0.22, 0.24, az * 0.2); ch.add(leg);
+        const seat = B().box(0.54, 0.06, 0.5, m.woodDark, 0.5); seat.position.y = 0.5; ch.add(seat);
+        const sap = B().box(0.5, 0.08, 0.05, m.woodDark, 0.4); sap.position.set(0, 0.45, 0.23); ch.add(sap);
+        const sap2 = sap.clone(); sap2.position.z = -0.23; ch.add(sap2);
+        const backPlate = B().box(0.48, 0.32, 0.035, m.woodDark, 0.4); backPlate.position.set(0, 0.76, -0.23); ch.add(backPlate);
+        for (const ax of [-1, 0, 1]) { const p = B().cyl(0.022, 0.022, 0.5, m.woodDark, 8); p.position.set(ax * 0.22, 0.78, -0.23); ch.add(p); }
+        const topRail = B().box(0.56, 0.08, 0.07, m.woodDark, 0.4); topRail.position.set(0, 1.02, -0.23); ch.add(topRail);
+        for (const ax of [-1, 1]) for (const az of [-1, 1]) leg4(ch, 0.5, ax * 0.23, az * 0.21, 0.03, 0.026);
+        const footRail = B().box(0.5, 0.04, 0.04, m.woodDark, 0.4); footRail.position.set(0, 0.14, 0.21); ch.add(footRail);
+        for (const ax of [-1, 1]) {
+          const arm = B().box(0.05, 0.05, 0.46, m.woodDark, 0.4); arm.position.set(ax * 0.25, 0.72, 0); ch.add(arm);
+          const armPost = B().cyl(0.02, 0.02, 0.2, m.woodDark, 6); armPost.position.set(ax * 0.25, 0.62, 0.2); ch.add(armPost);
         }
-        const arm = B().box(0.05, 0.05, 0.44, m.woodDark, 0.4);
-        arm.position.set(sx * 0.24, 0.68, 0); ch.add(arm);
-        ch.position.set(sx * 0.85, 0, 1.1);
+        ch.position.set(sx * 0.88, 0, 1.15);
         ch.rotation.y = -sx * rad(12);
         o.add(ch);
       }
@@ -123,23 +135,29 @@
     /** 板凳 */
     stool() {
       const m = M(), o = g();
-      const top = B().box(0.34, 0.04, 0.24, m.wood, 0.4);
-      top.position.y = 0.44; o.add(top);
+      const top = B().box(0.36, 0.05, 0.24, m.wood, 0.4);
+      top.position.y = 0.45; o.add(top);
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-        const leg = B().box(0.035, 0.44, 0.035, m.wood, 0.3);
-        leg.position.set(sx * 0.14, 0.22, sz * 0.09); o.add(leg);
+        const leg = B().cyl(0.02, 0.017, 0.45, m.wood, 8);
+        leg.position.set(sx * 0.15, 0.225, sz * 0.09); o.add(leg);
+      }
+      for (const sz of [-1, 1]) {
+        const st = B().box(0.3, 0.025, 0.025, m.wood, 0.3);
+        st.position.set(0, 0.18, sz * 0.09); o.add(st);
       }
       return MT.props.prop(o);
     },
     /** 老式挂钟 */
     clock() {
       const m = M(), o = g();
-      const body = B().box(0.32, 0.72, 0.14, m.woodDark, 0.5);
-      body.position.y = 1.9; o.add(body);
-      const face = B().cyl(0.12, 0.12, 0.03, m.white, 16);
-      face.rotation.x = Math.PI / 2; face.position.set(0, 2.1, 0.09); o.add(face);
-      const pend = B().cyl(0.05, 0.05, 0.3, m.yellow, 8);
-      pend.position.set(0, 1.62, 0.06); o.add(pend);
+      const body = B().box(0.34, 0.76, 0.16, m.woodDark, 0.5); body.position.y = 1.9; o.add(body);
+      const crown = B().box(0.4, 0.08, 0.2, m.woodDark, 0.4); crown.position.y = 2.3; o.add(crown);
+      const base = B().box(0.4, 0.08, 0.2, m.woodDark, 0.4); base.position.y = 1.5; o.add(base);
+      const face = B().cyl(0.13, 0.13, 0.02, m.white, 18); face.rotation.x = Math.PI / 2; face.position.set(0, 2.14, 0.09); o.add(face);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.135, 0.012, 6, 20), m.yellow); ring.position.set(0, 2.14, 0.095); o.add(ring);
+      const glass = B().box(0.28, 0.32, 0.01, m.window, 0.3); glass.position.set(0, 1.72, 0.085); o.add(glass);
+      const pend = B().box(0.02, 0.34, 0.02, m.yellow, 0.3); pend.position.set(0, 1.6, 0.06); o.add(pend);
+      const bob = B().cyl(0.055, 0.055, 0.02, m.yellow, 14); bob.rotation.x = Math.PI / 2; bob.position.set(0, 1.42, 0.07); o.add(bob);
       return MT.props.prop(o);
     },
     /** 神龛 / 供桌 */

@@ -43,37 +43,51 @@
    * ========================================================= */
   P.handPump = function () { // 压水井
     const m = M(), g = P.g();
-    const base = B().box(1.1, 0.25, 1.1, m.cement, 1.0);
-    base.position.y = 0.12; g.add(base);
-    const pipe = B().cyl(0.075, 0.075, 1.1, m.steel, 10);
-    pipe.position.set(0, 0.72, 0); g.add(pipe);
-    const head = B().box(0.42, 0.22, 0.24, m.metalDark, 0.6);
-    head.position.set(0, 1.22, 0); g.add(head);
-    const lever = B().box(0.07, 0.07, 0.95, m.metal, 0.5);
-    lever.position.set(0, 1.35, 0.42); lever.rotation.x = rad(-12); g.add(lever);
-    const handle = B().box(0.09, 0.09, 0.34, m.metalDark, 0.5);
-    handle.position.set(0, 1.52, 0.85); g.add(handle);
-    const spout = B().cyl(0.05, 0.05, 0.3, m.steel, 8);
-    spout.rotation.x = rad(70); spout.position.set(0.16, 1.05, 0.1); g.add(spout);
-    const trough = B().box(1.5, 0.34, 0.62, m.cement, 0.8);
-    trough.position.set(0.9, 0.18, 0); g.add(trough);
+    // 水泥井台
+    const base = B().cyl(0.62, 0.72, 0.22, m.cement, 16); base.position.y = 0.11; g.add(base);
+    const apron = B().cyl(0.5, 0.56, 0.06, m.concrete, 16); apron.position.y = 0.235; g.add(apron);
+    // 井管 + 泵头
+    const pipe = B().cyl(0.075, 0.085, 1.05, m.steel, 12); pipe.position.y = 0.72; g.add(pipe);
+    const head = B().cyl(0.14, 0.14, 0.34, m.metalDark, 14); head.position.y = 1.32; g.add(head);
+    const cap = B().cyl(0.15, 0.14, 0.06, m.steel, 14); cap.position.y = 1.52; g.add(cap);
+    // 出水嘴（弯）
+    const spout = B().cyl(0.05, 0.05, 0.34, m.steel, 10); spout.rotation.x = rad(78); spout.position.set(0.22, 1.28, 0.16); g.add(spout);
+    const spoutTip = B().cyl(0.055, 0.045, 0.08, m.steel, 10); spoutTip.rotation.x = rad(78); spoutTip.position.set(0.28, 1.22, 0.26); g.add(spoutTip);
+    // 压杆 + 木柄 + 支点
+    const arm = B().box(0.05, 0.05, 0.9, m.metal, 0.5); arm.position.set(0, 1.56, 0.34); arm.rotation.x = rad(-10); g.add(arm);
+    const grip = B().cyl(0.035, 0.035, 0.34, m.wood, 8); grip.rotation.x = rad(90); grip.position.set(0, 1.62, 0.78); g.add(grip);
+    const pivot = B().cyl(0.045, 0.045, 0.24, m.metalDark, 10); pivot.rotation.z = rad(90); pivot.position.set(0, 1.42, 0.02); g.add(pivot);
+    // 水槽
+    const trough = B().box(1.5, 0.36, 0.62, m.cement, 0.9); trough.position.set(1.0, 0.18, 0); g.add(trough);
+    const tIn = B().box(1.34, 0.02, 0.46, m.cement, 0.5); tIn.position.set(1.0, 0.3, 0); g.add(tIn);
     return prop(g);
   };
 
   P.stoneMill = function () { // 石磨
     const m = M(), g = P.g();
-    const base = B().cyl(0.62, 0.7, 0.3, m.stone, 16);
-    base.position.y = 0.15; g.add(base);
-    const lower = B().cyl(0.6, 0.6, 0.16, m.stone, 18);
-    lower.position.y = 0.38; g.add(lower);
-    const upper = B().cyl(0.56, 0.56, 0.2, m.stone, 18);
-    upper.position.y = 0.56; g.add(upper);
-    const hole = B().cyl(0.11, 0.11, 0.26, m.solidMud || m.mud, 8);
-    hole.position.y = 0.66; g.add(hole);
-    const stick = B().box(0.06, 0.5, 0.06, m.wood, 0.5);
-    stick.position.set(0.42, 0.78, 0); g.add(stick);
-    const handle = B().box(0.05, 0.05, 0.5, m.wood, 0.5);
-    handle.position.set(0.42, 1.0, 0.22); g.add(handle);
+    const wood = m.wood;
+    // 木架 + 托盘
+    const tray = B().cyl(0.88, 0.88, 0.07, wood, 18); tray.position.y = 0.42; g.add(tray);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      const leg = B().cyl(0.05, 0.062, 0.42, wood, 8);
+      leg.position.set(sx * 0.62, 0.21, sz * 0.62); g.add(leg);
+    }
+    // 上下磨盘
+    const lower = B().cyl(0.6, 0.6, 0.16, m.stone, 20); lower.position.y = 0.53; g.add(lower);
+    const upper = B().cyl(0.56, 0.56, 0.22, m.stone, 20); upper.position.y = 0.72; g.add(upper);
+    // 磨盘凿纹
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      const groove = B().box(0.4, 0.02, 0.03, m.stone, 0.5);
+      groove.position.set(Math.cos(a) * 0.3, 0.835, Math.sin(a) * 0.3);
+      groove.rotation.y = -a; g.add(groove);
+    }
+    // 漏斗 + 磨眼
+    const funnel = B().cyl(0.16, 0.05, 0.22, wood, 12); funnel.position.set(0.12, 1.0, 0); g.add(funnel);
+    const eye = B().cyl(0.045, 0.045, 0.3, m.solidMud || m.mud, 8); eye.position.set(0.12, 0.78, 0); g.add(eye);
+    // 磨棍
+    const stick = B().cyl(0.04, 0.045, 0.9, wood, 8); stick.position.set(0.5, 0.98, 0); stick.rotation.z = rad(80); g.add(stick);
+    const handle = B().cyl(0.03, 0.03, 0.3, wood, 8); handle.position.set(0.86, 1.06, 0); handle.rotation.x = rad(90); g.add(handle);
     return prop(g);
   };
 
