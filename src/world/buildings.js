@@ -237,11 +237,30 @@
     const ridge = G.box(slabW * 1.01, 0.2, 0.36, opts.ridgeMat || m.tileDark, 1.6);
     ridge.position.set(0, wallH + rise + 0.07, 0);
     g.add(ridge);
-    // 檐口封边
+    // 檐口封边（滴水）
     for (const sz of [-1, 1]) {
       const f = G.box(slabW, 0.16, 0.1, opts.wallMat || m.white, 1.0);
       f.position.set(0, wallH - eave * Math.sin(a) + 0.02, sz * (d / 2 + eave * Math.cos(a)));
       g.add(f);
+    }
+    // 檐下椽子（从下往上看得到，最能体现"瓦房"）
+    const rafterMat = opts.rafterMat || m.wood;
+    const nR = Math.max(5, Math.round(slabW / 0.42));
+    for (const sz of [-1, 1]) {
+      for (let i = 0; i < nR; i++) {
+        const x = -slabW / 2 + (i + 0.5) * (slabW / nR);
+        const r = G.box(0.06, 0.09, eave + 0.35, rafterMat, 0.5);
+        r.rotation.x = sz * a;
+        r.position.set(x, wallH - (eave + 0.35) * 0.5 * Math.sin(a) - 0.04, sz * (d / 2 + (eave + 0.35) * 0.5 * Math.cos(a)));
+        G.soft(r);
+        g.add(r);
+      }
+    }
+    // 屋脊两端的"翘角"
+    for (const sx of [-1, 1]) {
+      const up = G.box(0.28, 0.5, 0.34, opts.ridgeMat || m.tileDark, 1.0);
+      up.position.set(sx * slabW * 0.5, wallH + rise + 0.22, 0);
+      g.add(up);
     }
     g.userData.rise = rise;
     return G.soft(g);
@@ -338,6 +357,13 @@
         bar.position.set(i * w / 3.2, h / 2, 0.07);
         g.add(bar);
       }
+    } else if (opts.grid !== false) {
+      // 田字格窗棂
+      const barMat = opts.frameMat || m.white;
+      const v = G.box(0.04, h, 0.05, barMat, 0.5); v.position.set(0, h / 2, 0.062); g.add(v);
+      const hz = G.box(w, 0.04, 0.05, barMat, 0.5); hz.position.set(0, h / 2, 0.062); g.add(hz);
+      const hz2 = G.box(w, 0.03, 0.05, barMat, 0.5); hz2.position.set(0, h * 0.78, 0.062); g.add(hz2);
+      const hz3 = G.box(w, 0.03, 0.05, barMat, 0.5); hz3.position.set(0, h * 0.22, 0.062); g.add(hz3);
     }
     if (opts.awning) {
       const aw = G.box(w + 1.0, 0.06, 0.7, m.metal, 0.7);
@@ -408,6 +434,15 @@
         const skirt = G.box(w + 0.07, 0.9, d + 0.07, m.cement, 1.4);
         skirt.position.y = 0.45;
         body.add(skirt);
+      }
+      // 转角砖柱（略微出挑，破掉"薄板盒子"感）
+      const corMat = (opts.grey ? m.brickGrey : m.brickRed);
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const c = G.box(0.26, H, 0.26, corMat, tileSize);
+          c.position.set(sx * (w / 2 - 0.03), H / 2, sz * (d / 2 - 0.03));
+          body.add(c);
+        }
       }
     }
     // 地基
