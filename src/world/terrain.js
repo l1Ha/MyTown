@@ -407,11 +407,15 @@
         shader.uniforms.uRoadT = { value: roadT };
         shader.uniforms.uSandT = { value: sandT };
         shader.uniforms.uScale = { value: 1.0 };
-        shader.vertexShader = 'varying vec3 vSplat;\n' + shader.vertexShader.replace(
-          '#include <color_vertex>', '#include <color_vertex>\n  vSplat = vColor;'
-        );
+        shader.vertexShader = 'varying vec3 vSplat;\nvarying vec3 vWPos;\n' + shader.vertexShader
+          .replace('#include <color_vertex>', '#include <color_vertex>\n  vSplat = vColor;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
         shader.fragmentShader =
-          'varying vec3 vSplat;\nuniform sampler2D uSoilT;\nuniform sampler2D uRoadT;\nuniform sampler2D uSandT;\nuniform float uScale;\n' +
+          'varying vec3 vSplat;\nvarying vec3 vWPos;\nuniform sampler2D uSoilT;\nuniform sampler2D uRoadT;\nuniform sampler2D uSandT;\nuniform float uScale;\n' +
+          'float _h21(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }\n' +
+          'float _vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);\n' +
+          '  float a=_h21(i), b=_h21(i+vec2(1.0,0.0)), c=_h21(i+vec2(0.0,1.0)), d=_h21(i+vec2(1.0,1.0));\n' +
+          '  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y); }\n' +
           shader.fragmentShader
             .replace('#include <color_fragment>', '// splat masks (see map_fragment)')
             .replace('#include <map_fragment>', `
@@ -423,6 +427,10 @@
                 float mSoil = vSplat.r, mRoad = vSplat.g, mSand = vSplat.b;
                 float mGrass = clamp(1.0 - mSoil - mRoad - mSand, 0.0, 1.0);
                 vec4 texelColor = gT * mGrass + sT * mSoil + rT * mRoad + dT * mSand;
+                // 大尺度地表变化（按世界坐标），打散贴图的重复感
+                float mac = _vn(vWPos.xz * 0.02) * 0.6 + _vn(vWPos.xz * 0.09) * 0.4;
+                vec3 macTint = mix(vec3(0.92, 1.03, 0.86), vec3(1.07, 1.0, 0.93), mac);
+                texelColor.rgb *= mix(0.86, 1.16, mac) * macTint;
                 diffuseColor *= texelColor;
               #endif
             `);
