@@ -131,6 +131,7 @@
       // 供程序化贴图使用：各向异性上限 + 分辨率随画质缩放
       MT.maxAniso = this.maxAniso;
       MT.TEX_SCALE = this.quality === 'low' ? 0.25 : this.quality === 'medium' ? 0.5 : 1;
+      MT.BEVEL = (this.quality === 'high' || this.quality === 'ultra');   // 棱边倒角（软化硬直角）
     }
 
     _initScene() {

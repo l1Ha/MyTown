@@ -79,7 +79,44 @@
     return geo;
   }
 
+  /** 通用"盒投影"UV：按面法线主轴投影，可给任意几何体用（含倒角盒） */
+  function boxProjectUVs(geo, tile) {
+    if (!geo.attributes.normal) geo.computeVertexNormals();
+    const pos = geo.attributes.position, nor = geo.attributes.normal;
+    const uv = new Float32Array(pos.count * 2);
+    for (let i = 0; i < pos.count; i++) {
+      const nx = Math.abs(nor.getX(i)), ny = Math.abs(nor.getY(i)), nz = Math.abs(nor.getZ(i));
+      let u, v;
+      if (nx >= ny && nx >= nz) { u = pos.getZ(i); v = pos.getY(i); }
+      else if (ny >= nx && ny >= nz) { u = pos.getX(i); v = pos.getZ(i); }
+      else { u = pos.getX(i); v = pos.getY(i); }
+      uv[i * 2] = u / tile; uv[i * 2 + 1] = v / tile;
+    }
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    return geo;
+  }
+  /** 倒角盒体：棱边做成小斜面，消除"死直角"，光照下有细高光 */
+  G.bevelBox = function (w, h, d, mat, tile, b) {
+    b = b || Math.min(0.028, Math.min(w, h, d) * 0.16);
+    const hw = Math.max(0.002, w / 2 - b), hh = Math.max(0.002, h / 2 - b);
+    const shape = new THREE.Shape();
+    shape.moveTo(-hw, -hh); shape.lineTo(hw, -hh); shape.lineTo(hw, hh); shape.lineTo(-hw, hh); shape.closePath();
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      depth: Math.max(0.002, d - 2 * b), bevelEnabled: true,
+      bevelThickness: b, bevelSize: b, bevelSegments: 1, steps: 1, curveSegments: 1,
+    });
+    geo.translate(0, 0, -(d / 2 - b));
+    geo.computeVertexNormals();
+    boxProjectUVs(geo, tile || 1);
+    const m = new THREE.Mesh(geo, mat);
+    m.castShadow = true; m.receiveShadow = true;
+    return m;
+  };
   G.box = function (w, h, d, mat, tile) {
+    if (MT.BEVEL) {
+      const b = Math.min(0.028, Math.min(w, h, d) * 0.16);
+      if (b > 0.0045) return G.bevelBox(w, h, d, mat, tile, b);
+    }
     const g = new THREE.BoxGeometry(w, h, d);
     if (tile) scaleBoxUV(g, w, h, d, tile);
     const m = new THREE.Mesh(g, mat);
