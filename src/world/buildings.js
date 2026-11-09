@@ -507,6 +507,24 @@
       }
     }
 
+    // 空调外机（砖房 / 楼房）
+    if (style !== 'old' && opts.ac !== false && Math.random() < 0.65) {
+      const ac = new THREE.Group();
+      const unit = G.box(0.72, 0.5, 0.3, m.white, 0.6); ac.add(unit);
+      for (let i = 0; i < 4; i++) { const f = G.box(0.6, 0.02, 0.02, m.steel, 0.3); f.position.set(0, -0.16 + i * 0.11, 0.16); ac.add(f); }
+      const bracket = G.box(0.78, 0.05, 0.34, m.metalDark, 0.4); bracket.position.set(0, -0.3, -0.02); ac.add(bracket);
+      const drip = G.cyl(0.02, 0.02, 0.6, m.steel, 6); drip.position.set(0.3, -0.35, 0); ac.add(drip);
+      ac.position.set(w / 2 + 0.16, 2.6, -d * 0.2);
+      ac.rotation.y = Math.PI / 2;
+      G.soft(ac);
+      body.add(ac);
+    }
+    // 电表箱 + 入户线管
+    if (style !== 'old') {
+      const meter = G.box(0.28, 0.36, 0.12, m.white, 0.4); meter.position.set(w / 2 + 0.07, 2.2, d * 0.26); body.add(meter);
+      const conduit = G.cyl(0.02, 0.02, 2.0, m.metalDark, 6); conduit.position.set(w / 2 + 0.05, 1.1, d * 0.26); body.add(conduit);
+    }
+
     // 屋顶
     let roof;
     if (style === 'two') {

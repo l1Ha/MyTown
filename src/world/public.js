@@ -402,7 +402,40 @@
       c.position.set(sx * (w / 2 - 0.16), 2.1, -d / 2 + 0.2);
       root.add(c);
     }
-    // 天井里的香炉台
+    // 门前石狮一对
+    const lion = (sx) => {
+      const gg = g();
+      const ped = B().box(0.62, 0.7, 0.62, m.stone, 0.9); ped.position.y = 0.35; gg.add(ped);
+      const body = B().box(0.42, 0.5, 0.72, m.stone, 0.7); body.position.set(0, 0.95, 0); gg.add(body);
+      const chest = B().sphere(0.27, m.stone, 10); chest.position.set(0, 1.16, 0.2); chest.scale.set(1, 1.15, 0.8); gg.add(chest);
+      const mane = B().sphere(0.34, m.stone, 12); mane.position.set(0, 1.45, -0.02); mane.scale.set(1.05, 0.9, 0.9); gg.add(mane);
+      const head = B().sphere(0.29, m.stone, 12); head.position.set(0, 1.5, 0.16); gg.add(head);
+      const snout = B().box(0.22, 0.16, 0.2, m.stone, 0.4); snout.position.set(0, 1.42, 0.36); gg.add(snout);
+      for (const ex of [-1, 1]) { const eye = B().sphere(0.035, m.metalDark, 6); eye.position.set(ex * 0.1, 1.56, 0.34); gg.add(eye); }
+      for (const ex of [-1, 1]) {
+        const leg = B().cyl(0.08, 0.09, 0.5, m.stone, 8); leg.position.set(ex * 0.16, 0.95, 0.36); gg.add(leg);
+        const paw = B().box(0.18, 0.1, 0.26, m.stone, 0.4); paw.position.set(ex * 0.16, 0.76, 0.44); gg.add(paw);
+      }
+      const tail = B().cyl(0.05, 0.05, 0.4, m.stone, 6); tail.position.set(0, 1.2, -0.36); tail.rotation.x = rad(-30); gg.add(tail);
+      gg.position.set(sx * (w / 2 + 1.5), 0.5, d / 2 + 1.2);
+      gg.rotation.y = sx * rad(-10);
+      gg.traverse((o) => { o.userData.noCollide = true; });
+      return gg;
+    };
+    root.add(lion(-1)); root.add(lion(1));
+    // 抱鼓石
+    for (const sx of [-1, 1]) {
+      const drum = B().cyl(0.26, 0.26, 0.18, m.stone, 14); drum.rotation.x = Math.PI / 2; drum.position.set(sx * (w / 2 - 0.7), 0.9, d / 2 + 0.9); root.add(drum);
+      const stand = B().box(0.48, 0.48, 0.24, m.stone, 0.6); stand.position.set(sx * (w / 2 - 0.7), 0.74, d / 2 + 0.9); root.add(stand);
+    }
+    // 门前踏跺
+    for (let i = 0; i < 3; i++) {
+      const st = B().box(w * 0.66 + i * 0.7, 0.17, 0.44 + i * 0.22, m.stone, 0.8);
+      st.position.set(0, 0.5 - (i + 1) * 0.17, d / 2 + 0.5 + i * 0.22); root.add(st);
+    }
+    // 廊下灯笼
+    const lampL = P().lantern(); lampL.position.set(-(w / 2 - 0.7), 3.1, d / 2 + 0.75); root.add(lampL);
+    const lampR = P().lantern(); lampR.position.set((w / 2 - 0.7), 3.1, d / 2 + 0.75); root.add(lampR);
     root.userData.enterable = true;
     return root;
   };
@@ -527,6 +560,23 @@
     const flag = B().plane(1.4, 0.95, m.red, 1, 1);
     flag.position.set(0.73, 8.1, d / 2 + 3.0); root.add(flag);
     MT.props.anim(flag, (t) => { flag.rotation.y = Math.sin(t * 1.2) * 0.25; });
+    // 墙标语
+    for (const sx of [-1, 1]) {
+      const sl = B().plane(4.2, 0.75, MT.texture.textMat(sx < 0 ? '好好学习' : '天天向上', {
+        key: 'schoolsl' + sx, w: 1024, h: 200, bg: '#a8251b', color: '#f6e2a8', fontSize: 150, serif: true,
+      }), 1, 1);
+      sl.position.set(sx * 5.2, 4.5, d / 2 + 0.05);
+      root.add(sl);
+    }
+    // 乒乓球台
+    const tt = g();
+    const ttop = B().box(2.74, 0.05, 1.52, m.steel, 0.9); ttop.position.y = 0.76; tt.add(ttop);
+    const tline = B().box(2.74, 0.01, 0.03, m.white, 0.4); tline.position.set(0, 0.79, 0); tt.add(tline);
+    const tnet = B().box(0.02, 0.16, 1.52, m.white, 0.4); tnet.position.set(0, 0.86, 0); tt.add(tnet);
+    for (const ex of [-1, 1]) for (const ez of [-1, 1]) {
+      const tleg = B().box(0.06, 0.76, 0.06, m.steel, 0.4); tleg.position.set(ex * 1.22, 0.38, ez * 0.64); tt.add(tleg);
+    }
+    tt.position.set(6.5, 0, d / 2 + 20); root.add(tt);
     // 单杠 / 双杠
     const bar = B().cyl(0.035, 0.035, 2.4, m.steel, 8);
     bar.rotation.z = Math.PI / 2; bar.position.set(-6, 1.6, d / 2 + 20); root.add(bar);
