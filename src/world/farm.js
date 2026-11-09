@@ -164,6 +164,7 @@
           map: MT.tex[c.tex](), alphaTest: 0.38, transparent: false,
           side: THREE.DoubleSide, roughness: 1.0, color: 0xffffff,
         });
+        if (MT.windMaterial) MT.windMaterial(mat, 0.05);
         const set = new MT.InstSet(geo, mat, this.instanceBudget, 'crop_' + key);
         set.mesh.castShadow = false;
         set.mesh.receiveShadow = false;

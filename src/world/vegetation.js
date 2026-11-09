@@ -9,6 +9,35 @@
   const THREE = window.THREE;
   const { rad, lerp, clamp, TAU } = MT.util;
 
+  /* ---------------- 风摆（给草 / 芦苇 / 野花 / 庄稼用） ----------------
+   * 在顶点着色器里按"高度权重 + 世界位置相位"让植物随风轻摆。 */
+  MT._windU = MT._windU || { value: 0 };
+  MT.windMaterial = function (mat, strength) {
+    if (!mat || mat.userData._wind) return mat;
+    mat.userData._wind = true;
+    const prev = mat.onBeforeCompile;
+    mat.onBeforeCompile = function (shader) {
+      if (prev) prev(shader);
+      shader.uniforms.uTime = MT._windU;
+      shader.uniforms.uWind = { value: strength === undefined ? 0.06 : strength };
+      shader.vertexShader = 'uniform float uTime;\nuniform float uWind;\n' + shader.vertexShader
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          #ifdef USE_INSTANCING
+            vec3 _ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+          #else
+            vec3 _ip = vec3(0.0);
+          #endif
+          float _hf = clamp(uv.y, 0.0, 1.0); _hf *= _hf;
+          float _sw = sin(uTime * 1.6 + _ip.x * 0.25 + _ip.z * 0.2) * 0.6
+                    + sin(uTime * 3.3 + _ip.z * 0.4 + _ip.x * 0.1) * 0.25;
+          transformed.x += _sw * uWind * _hf;
+          transformed.z += _sw * 0.55 * uWind * _hf;`);
+    };
+    mat.needsUpdate = true;
+    return mat;
+  };
+  MT.windTick = function (dt) { MT._windU.value += dt; };
+
   /* ---------------- 树种表 ---------------- */
   const SPECIES = {
     poplar: { // 杨树：淮河两岸最常见的行道树、防护林
@@ -413,11 +442,12 @@
     /* ---------- 草丛 ---------- */
     _buildGrass() {
       const r = this.rng, T = this.terrain;
-      const geo = crossedGeo(0.75, 0.62, 3);
+      const geo = crossedGeo(0.82, 0.72, 3);
       const mat = new THREE.MeshStandardMaterial({
         map: MT.tex.blade(), alphaTest: 0.42, transparent: false,
         side: THREE.DoubleSide, roughness: 1.0, color: 0xffffff,
       });
+      MT.windMaterial(mat, 0.07);
       const N = Math.round((this.quality === 'low' ? 2600 : this.quality === 'medium' ? 5200 : 9000));
       const set = new InstSet(geo, mat, N, 'grass');
       let tries = 0;
@@ -434,6 +464,8 @@
         if (T.slopeAt(x, z) > 0.6) continue;
         const y = T.heightAt(x, z);
         set.add({ x, y: y - 0.06, z }, r.next() * TAU, r.range(0.7, 1.6), 1, 0);
+        const gi = set.items[set.items.length - 1];
+        gi.rx = r.range(-0.13, 0.13); gi.rz = r.range(-0.13, 0.13);
       }
       set.mesh.castShadow = false;
       set.mesh.receiveShadow = true;
@@ -450,6 +482,7 @@
         map: MT.tex.reed(), alphaTest: 0.4, transparent: false,
         side: THREE.DoubleSide, roughness: 1.0, color: 0xffffff,
       });
+      MT.windMaterial(mat, 0.1);
       const N = this.quality === 'low' ? 1200 : 3400;
       const set = new InstSet(geo, mat, N, 'reed');
       let tries = 0;
@@ -564,6 +597,7 @@
         map: MT.tex.flower(), alphaTest: 0.4, transparent: false,
         side: THREE.DoubleSide, roughness: 1.0, color: 0xffffff,
       });
+      MT.windMaterial(mat, 0.05);
       const set = new InstSet(geo, mat, N, 'flower');
       const palette = [new THREE.Color(0xf6d84a), new THREE.Color(0xf6f2e6), new THREE.Color(0xe89ab4), new THREE.Color(0xb79ae0), new THREE.Color(0xe6784a)];
       let tries = 0;
@@ -725,7 +759,7 @@
     }
 
     update(dt, camera) {
-      // 目前植被为静态实例，无需逐帧更新（为将来的风摆动预留）
+      MT.windTick(dt);   // 推进风摆时间
     }
   }
 
