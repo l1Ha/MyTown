@@ -341,10 +341,10 @@
       const dV = Math.hypot(x - VILLAGE.x, z - VILLAGE.z);
       const dW = Math.hypot(x - WA_CLUSTER.x, z - WA_CLUSTER.z);
 
-      // 农田区（村庄以南、村庄外围）
-      if (z > 34 || (z > -175 && x < -60)) {
+      // 农田区（村庄以南的大片旱地；丘陵/林地保持草地）
+      if (z > 34) {
         const patch = smoothstep(0.0, 0.55, baseNoise.fbm(x * 0.012 + 40, z * 0.012 - 20, 3) * 0.5 + 0.5);
-        mSoil = 0.28 + 0.5 * patch;
+        mSoil = 0.24 + 0.46 * patch;
       }
       // 村内地面多为土
       if (dV < 96) mSoil = Math.max(mSoil, 0.42 * (1 - smoothstep(60, 96, dV)));

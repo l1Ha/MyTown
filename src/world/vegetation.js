@@ -312,7 +312,10 @@
         const trunkSet = new InstSet(trunkGeo, trunkMat, list.length, key + '_trunk');
         const branchSet = new InstSet(branchGeo, trunkMat, list.length * 12, key + '_branch');
         // 树冠
-        const leafMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, flatShading: true });
+        const leafMat = new THREE.MeshStandardMaterial({
+          color: 0xffffff, roughness: 0.9, flatShading: false,
+          map: MT.tex.leafCluster(), alphaTest: 0.42, side: THREE.DoubleSide,
+        });
         const leafGeo = spec.leafGeo === 'cone' ? coneGeo : this._lumpyGeo(blobDetail, key.length * 7 + 3);
         const cap = list.length * (Math.ceil(spec.blobs * blobMul) + 10);
         const leafSet = new InstSet(leafGeo.clone(), leafMat, cap, key + '_leaf');
@@ -331,16 +334,16 @@
 
           // 树枝：中上部向外分叉
           if (spec.leafGeo !== 'cone') {
-            const nBr = Math.round((4 + spec.blobs) * (this.quality === 'low' ? 0.55 : 1));
+            const nBr = Math.max(3, Math.round((3 + spec.blobs * 0.6) * (this.quality === 'low' ? 0.6 : 1)));
             for (let b = 0; b < nBr; b++) {
               const az = rng.next() * TAU;
-              const bh = h * rng.range(0.42, 0.72);
-              const len = cr * rng.range(0.7, 1.15) + rng.range(1, 2.4);
-              const tilt = rng.range(50, 76) * Math.PI / 180;
-              branchSet.add({ x: p.x + Math.cos(az) * tr * 0.3, y: gy + bh, z: p.z + Math.sin(az) * tr * 0.3 }, az, 1, 1, 0);
+              const bh = h * rng.range(0.5, 0.72);
+              const len = cr * rng.range(0.45, 0.75) + rng.range(0.6, 1.4);
+              const tilt = rng.range(48, 72) * Math.PI / 180;
+              branchSet.add({ x: p.x + Math.cos(az) * tr * 0.4, y: gy + bh, z: p.z + Math.sin(az) * tr * 0.4 }, az, 1, 1, 0);
               const bit = branchSet.items[branchSet.items.length - 1];
               bit.rx = tilt; bit.ry = az;
-              bit.sx = tr * rng.range(0.28, 0.44); bit.sz = bit.sx; bit.sy = len;
+              bit.sx = tr * rng.range(0.5, 0.8); bit.sz = bit.sx; bit.sy = len;
             }
           }
 
@@ -448,7 +451,7 @@
         side: THREE.DoubleSide, roughness: 1.0, color: 0xffffff,
       });
       MT.windMaterial(mat, 0.07);
-      const N = Math.round((this.quality === 'low' ? 2600 : this.quality === 'medium' ? 5200 : 9000));
+      const N = Math.round((this.quality === 'low' ? 3000 : this.quality === 'medium' ? 7000 : 14000));
       const set = new InstSet(geo, mat, N, 'grass');
       let tries = 0;
       while (set.items.length < N && tries < N * 6) {
@@ -565,7 +568,10 @@
       if (N === 0) return;
       const r = this.rng, T = this.terrain;
       const geo = this._lumpyGeo(this.quality === 'high' ? 1 : 0, 21);
-      const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1.0, flatShading: true });
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0xffffff, roughness: 1.0, flatShading: false,
+        map: MT.tex.leafCluster(), alphaTest: 0.42, side: THREE.DoubleSide,
+      });
       const set = new InstSet(geo, mat, N, 'bush');
       let tries = 0;
       while (set.items.length < N && tries < N * 8) {
@@ -652,7 +658,10 @@
         g.add(br);
       }
       // 树冠（多个球）
-      const leafMat = new THREE.MeshStandardMaterial({ color: 0x4f8a3a, roughness: 0.95, flatShading: true });
+      const leafMat = new THREE.MeshStandardMaterial({
+        color: 0x4f8a3a, roughness: 0.95, flatShading: false,
+        map: MT.tex.leafCluster(), alphaTest: 0.42, side: THREE.DoubleSide,
+      });
       const blobs = [];
       for (let i = 0; i < 14; i++) {
         const a = r.next() * TAU;

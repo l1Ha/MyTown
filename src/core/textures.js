@@ -913,6 +913,22 @@
       }
     }),
 
+    /* ---- 叶簇（透明底；叶片近白，便于按实例着色出四季叶色）---- */
+    leafCluster: () => tex('leafCluster', qsize(256), (ctx, s) => {
+      ctx.clearRect(0, 0, s, s);
+      for (let i = 0; i < 240; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const rad = Math.pow(Math.random(), 0.62) * s * 0.46;
+        const x = s / 2 + Math.cos(a) * rad, y = s / 2 + Math.sin(a) * rad;
+        const r = s * (0.045 + Math.random() * 0.06);
+        const shade = 190 + Math.random() * 60;
+        ctx.fillStyle = `rgba(${shade | 0},${(shade * 1.02) | 0},${(shade * 0.9) | 0},${0.8 + Math.random() * 0.2})`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, r, r * 0.6, a + Math.random(), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }),
+
     /* ---- 野花（透明底；花瓣近白，便于按实例着色）---- */
     flower: () => tex('flower', qsize(128), (ctx, s) => {
       baseFill(ctx, s, [238, 238, 228], 0.10);
