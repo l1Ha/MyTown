@@ -913,19 +913,21 @@
       }
     }),
 
-    /* ---- 叶簇（透明底；叶片近白，便于按实例着色出四季叶色）---- */
+    /* ---- 叶面（不透明；浅色叶片 + 叶脉，供实例着色成四季叶色）---- */
     leafCluster: () => tex('leafCluster', qsize(256), (ctx, s) => {
-      ctx.clearRect(0, 0, s, s);
-      for (let i = 0; i < 240; i++) {
+      ctx.fillStyle = '#cbd1c2'; ctx.fillRect(0, 0, s, s);
+      for (let i = 0; i < 460; i++) {
+        const x = Math.random() * s, y = Math.random() * s;
+        const r = s * (0.05 + Math.random() * 0.075);
         const a = Math.random() * Math.PI * 2;
-        const rad = Math.pow(Math.random(), 0.62) * s * 0.46;
-        const x = s / 2 + Math.cos(a) * rad, y = s / 2 + Math.sin(a) * rad;
-        const r = s * (0.045 + Math.random() * 0.06);
-        const shade = 190 + Math.random() * 60;
-        ctx.fillStyle = `rgba(${shade | 0},${(shade * 1.02) | 0},${(shade * 0.9) | 0},${0.8 + Math.random() * 0.2})`;
-        ctx.beginPath();
-        ctx.ellipse(x, y, r, r * 0.6, a + Math.random(), 0, Math.PI * 2);
-        ctx.fill();
+        const t = 198 + Math.random() * 57;
+        ctx.fillStyle = `rgba(${t | 0},${(t * 1.03) | 0},${(t * 0.92) | 0},0.5)`;
+        ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.62, a, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.strokeStyle = 'rgba(146,152,134,0.35)'; ctx.lineWidth = 1.2;
+      for (let i = 0; i < 170; i++) {
+        const x = Math.random() * s, y = Math.random() * s, a = Math.random() * Math.PI, l = 4 + Math.random() * 9;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); ctx.stroke();
       }
     }),
 

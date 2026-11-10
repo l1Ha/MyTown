@@ -313,8 +313,7 @@
         const branchSet = new InstSet(branchGeo, trunkMat, list.length * 12, key + '_branch');
         // 树冠
         const leafMat = new THREE.MeshStandardMaterial({
-          color: 0xffffff, roughness: 0.9, flatShading: false,
-          map: MT.tex.leafCluster(), alphaTest: 0.42, side: THREE.DoubleSide,
+          color: 0xffffff, roughness: 0.9, map: MT.tex.leafCluster(),
         });
         const leafGeo = spec.leafGeo === 'cone' ? coneGeo : this._lumpyGeo(blobDetail, key.length * 7 + 3);
         const cap = list.length * (Math.ceil(spec.blobs * blobMul) + 10);
@@ -568,10 +567,7 @@
       if (N === 0) return;
       const r = this.rng, T = this.terrain;
       const geo = this._lumpyGeo(this.quality === 'high' ? 1 : 0, 21);
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0xffffff, roughness: 1.0, flatShading: false,
-        map: MT.tex.leafCluster(), alphaTest: 0.42, side: THREE.DoubleSide,
-      });
+      const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1.0, map: MT.tex.leafCluster() });
       const set = new InstSet(geo, mat, N, 'bush');
       let tries = 0;
       while (set.items.length < N && tries < N * 8) {
@@ -583,7 +579,7 @@
         if (T.slopeAt(x, z) > 0.55) continue;
         if (MT.inBuildZone(x, z, -0.5)) continue;
         if (r.chance(0.5)) continue;
-        set.add({ x, y: T.heightAt(x, z) + 0.1, z }, r.next() * TAU, r.range(0.5, 1.3), 1, 0);
+        set.add({ x, y: T.heightAt(x, z) + 0.1, z }, r.next() * TAU, r.range(0.35, 0.9), 1, 0);
         const it = set.items[set.items.length - 1];
         it.sy = r.range(0.6, 0.85); it.sx = it.sz = r.range(0.9, 1.2);
       }
@@ -658,10 +654,7 @@
         g.add(br);
       }
       // 树冠（多个球）
-      const leafMat = new THREE.MeshStandardMaterial({
-        color: 0x4f8a3a, roughness: 0.95, flatShading: false,
-        map: MT.tex.leafCluster(), alphaTest: 0.42, side: THREE.DoubleSide,
-      });
+      const leafMat = new THREE.MeshStandardMaterial({ color: 0x4f8a3a, roughness: 0.95, map: MT.tex.leafCluster() });
       const blobs = [];
       for (let i = 0; i < 14; i++) {
         const a = r.next() * TAU;
