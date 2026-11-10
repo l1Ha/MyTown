@@ -89,47 +89,71 @@
       this.body.add(collar);
 
       // 脖子 + 头
-      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.055 * s, 0.07 * s, 0.1 * s, 8), skinMat);
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.055 * s, 0.075 * s, 0.12 * s, 10), skinMat);
       neck.position.y = 1.4 * s; this.body.add(neck);
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.12 * s, 16, 12), skinMat);
-      head.position.y = 1.54 * s; head.scale.set(0.92, 1.06, 0.96);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.125 * s, 18, 14), skinMat);
+      head.position.y = 1.55 * s; head.scale.set(0.9, 1.04, 0.96);
       head.castShadow = true;
       this.head = head;
       this.body.add(head);
+      // 下颌 / 下巴
+      const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.088 * s, 12, 10), skinMat);
+      jaw.position.set(0, 1.487 * s, 0.02 * s); jaw.scale.set(0.96, 0.82, 1.02);
+      this.body.add(jaw);
       // 耳朵
       for (const sx of [-1, 1]) {
-        const ear = new THREE.Mesh(new THREE.SphereGeometry(0.028 * s, 8, 6), skinMat);
-        ear.position.set(sx * 0.11 * s, 1.54 * s, 0);
-        ear.scale.set(0.6, 1, 1);
+        const ear = new THREE.Mesh(new THREE.SphereGeometry(0.03 * s, 10, 8), skinMat);
+        ear.position.set(sx * 0.113 * s, 1.545 * s, -0.005 * s);
+        ear.scale.set(0.55, 1.05, 0.9);
         this.body.add(ear);
       }
-      // 鼻子
-      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.022 * s, 8, 6), skinMat);
-      nose.position.set(0, 1.525 * s, 0.115 * s);
-      nose.scale.set(0.8, 0.9, 1);
+      // 鼻子（楔形 + 鼻头）
+      const nose = new THREE.Mesh(new THREE.BoxGeometry(0.03 * s, 0.055 * s, 0.04 * s), skinMat);
+      nose.position.set(0, 1.535 * s, 0.116 * s); nose.rotation.x = rad(-8);
       this.body.add(nose);
-      // 头发
-      const hair = new THREE.Mesh(new THREE.SphereGeometry(0.125 * s, 14, 10, 0, TAU, 0, Math.PI * 0.6),
-        new THREE.MeshStandardMaterial({ color: old ? 0x8a8a86 : 0x1f1c1a, roughness: 0.9 }));
-      hair.position.y = 1.55 * s;
-      hair.rotation.x = rad(6);
-      this.body.add(hair);
-      // 五官（眼睛 + 眉毛 + 嘴）
-      const eyeMat = new THREE.MeshStandardMaterial({ color: 0x201c18, roughness: 0.6 });
+      const noseTip = new THREE.Mesh(new THREE.SphereGeometry(0.015 * s, 8, 6), skinMat);
+      noseTip.position.set(0, 1.518 * s, 0.128 * s); this.body.add(noseTip);
+      // 眼白 + 瞳孔 + 眉毛
+      const scleraMat = new THREE.MeshStandardMaterial({ color: 0xf3efe6, roughness: 0.5 });
+      const pupilMat = new THREE.MeshStandardMaterial({ color: 0x1e1811, roughness: 0.4 });
       const browMat = new THREE.MeshStandardMaterial({ color: 0x2a2320, roughness: 0.9 });
       for (const sx of [-1, 1]) {
-        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018 * s, 8, 6), eyeMat);
-        eye.position.set(sx * 0.044 * s, 1.555 * s, 0.108 * s);
-        this.body.add(eye);
-        const brow = new THREE.Mesh(new THREE.BoxGeometry(0.05 * s, 0.01 * s, 0.012 * s), browMat);
-        brow.position.set(sx * 0.045 * s, 1.585 * s, 0.112 * s);
-        brow.rotation.z = sx * rad(6);
+        const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.023 * s, 10, 8), scleraMat);
+        sclera.position.set(sx * 0.045 * s, 1.572 * s, 0.1 * s); sclera.scale.set(1, 0.82, 0.62);
+        this.body.add(sclera);
+        const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.011 * s, 8, 6), pupilMat);
+        pupil.position.set(sx * 0.045 * s, 1.572 * s, 0.115 * s);
+        this.body.add(pupil);
+        const brow = new THREE.Mesh(new THREE.BoxGeometry(0.05 * s, 0.011 * s, 0.012 * s), browMat);
+        brow.position.set(sx * 0.046 * s, 1.602 * s, 0.11 * s); brow.rotation.z = sx * rad(7);
         this.body.add(brow);
       }
-      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.045 * s, 0.012 * s, 0.01 * s),
-        new THREE.MeshStandardMaterial({ color: 0x7a3a30, roughness: 0.8 }));
-      mouth.position.set(0, 1.49 * s, 0.11 * s);
-      this.body.add(mouth);
+      // 嘴
+      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.042 * s, 0.011 * s, 0.012 * s),
+        new THREE.MeshStandardMaterial({ color: 0x8a4a40, roughness: 0.8 }));
+      mouth.position.set(0, 1.497 * s, 0.112 * s); this.body.add(mouth);
+      // 头发（多种发型）
+      const hairMat = new THREE.MeshStandardMaterial({ color: old ? 0x8f8b86 : 0x211d1a, roughness: 0.95 });
+      const style2 = (this.role === 'child') ? 'bowl' : (old ? 'short' : (r.chance(0.45) ? 'bowl' : (r.chance(0.5) ? 'bun' : 'short')));
+      this.hairStyle = style2;
+      if (style2 !== 'bald') {
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.132 * s, 16, 12, 0, TAU, 0, Math.PI * 0.56), hairMat);
+        cap.position.y = 1.552 * s; cap.scale.set(1.0, 1.03, 1.06); cap.rotation.x = rad(4);
+        this.body.add(cap);
+        // 后脑发量（不遮脸）
+        const back = new THREE.Mesh(new THREE.SphereGeometry(0.125 * s, 14, 12), hairMat);
+        back.position.set(0, 1.55 * s, -0.048 * s); back.scale.set(0.95, 0.95, 0.62);
+        this.body.add(back);
+        if (style2 === 'bowl') {
+          const fringe = new THREE.Mesh(new THREE.BoxGeometry(0.2 * s, 0.038 * s, 0.03 * s), hairMat);
+          fringe.position.set(0, 1.652 * s, 0.098 * s); fringe.rotation.x = rad(15);
+          this.body.add(fringe);
+        } else if (style2 === 'bun') {
+          const bun = new THREE.Mesh(new THREE.SphereGeometry(0.055 * s, 12, 10), hairMat);
+          bun.position.set(0, 1.585 * s, -0.135 * s);
+          this.body.add(bun);
+        }
+      }
 
       // 手臂（两段胶囊 + 圆手）
       this.arms = [];

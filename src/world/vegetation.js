@@ -321,6 +321,11 @@
         const leafGeo = cone ? coneGeo : leafCardGeo();
         const cap = list.length * (cone ? (Math.ceil(spec.blobs * blobMul) + 10) : (cardsPer + 8)) + 8;
         const leafSet = new InstSet(leafGeo.clone(), leafMat, cap, key + '_leaf');
+        // 内芯团块（不透明），保证树冠有实体感
+        const coreSet = cone ? null : new InstSet(
+          this._lumpyGeo(blobDetail, key.length * 13 + 5),
+          new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, map: MT.tex.leafCluster() }),
+          list.length * 6 + 4, key + '_core');
 
         for (const p of list) {
           const h = lerp(spec.h[0], spec.h[1], rng.next()) * p.s;
@@ -379,6 +384,15 @@
                 li.rz = rng.range(-0.9, 0.9); li.sy = 0.85;
               }
             }
+            // 内芯团块
+            for (let k = 0; k < 4; k++) {
+              const ca = rng.next() * TAU, ce = (rng.next() - 0.5) * 1.4, crr = Math.cbrt(rng.next()) * 0.6;
+              coreSet.add({
+                x: p.x + Math.cos(ca) * cr * crr,
+                y: baseY + Math.sin(ce) * ch * crr * 0.6,
+                z: p.z + Math.sin(ca) * cr * crr,
+              }, rng.next() * TAU, cr * rng.range(0.5, 0.68), 1, 0);
+            }
           }
 
           if (spec.collider || h > 7) {
@@ -400,13 +414,14 @@
         trunkSet.mesh.instanceMatrix.needsUpdate = true;
         branchSet.commit();
         leafSet.commit();
+        if (coreSet) { coreSet.commit(); coreSet.mesh.castShadow = true; coreSet.mesh.receiveShadow = true; this.group.add(coreSet.mesh); }
         trunkSet.mesh.castShadow = true; trunkSet.mesh.receiveShadow = true;
         branchSet.mesh.castShadow = true;
         leafSet.mesh.castShadow = true; leafSet.mesh.receiveShadow = true;
         this.group.add(trunkSet.mesh);
         this.group.add(branchSet.mesh);
         this.group.add(leafSet.mesh);
-        this.trees[key] = { trunk: trunkSet, branch: branchSet, leaf: leafSet, spec };
+        this.trees[key] = { trunk: trunkSet, branch: branchSet, leaf: leafSet, core: coreSet, spec };
       }
     }
 
@@ -727,6 +742,10 @@
           return col;
         }, (it) => (bare ? (spec.leafGeo === 'cone' ? 0.95 : 0.16) : 1));
         t.leaf.mesh.visible = !bare || spec.leafGeo === 'cone';
+        if (t.core) {
+          t.core.applySeason((it, col) => { col.copy(c); col.multiplyScalar(0.86 + ((it.ry * 7919) % 1) * 0.3); return col; }, (it) => (bare ? 0.16 : 1));
+          t.core.mesh.visible = !bare;
+        }
       }
       if (this.grassSet) {
         const gc = { spring: 0xa8c46a, summer: 0x8fb454, autumn: 0xc0a858, winter: 0x9a8f70 }[key] || 0x8fb454;
