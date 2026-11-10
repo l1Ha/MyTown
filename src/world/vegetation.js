@@ -312,11 +312,14 @@
         const trunkSet = new InstSet(trunkGeo, trunkMat, list.length, key + '_trunk');
         const branchSet = new InstSet(branchGeo, trunkMat, list.length * 12, key + '_branch');
         // 树冠
-        const leafMat = new THREE.MeshStandardMaterial({
-          color: 0xffffff, roughness: 0.9, map: MT.tex.leafCluster(),
-        });
-        const leafGeo = spec.leafGeo === 'cone' ? coneGeo : this._lumpyGeo(blobDetail, key.length * 7 + 3);
-        const cap = list.length * (Math.ceil(spec.blobs * blobMul) + 10);
+        const cone = spec.leafGeo === 'cone';
+        const cardsPer = cone ? 0 : (this.quality === 'low' ? 8 : this.quality === 'medium' ? 12 : 18);
+        const leafMat = cone
+          ? new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, map: MT.tex.leafCluster() })
+          : new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, map: MT.tex.leafCard(), alphaTest: 0.45, side: THREE.DoubleSide });
+        if (!cone) MT.windMaterial(leafMat, 0.07);
+        const leafGeo = cone ? coneGeo : leafCardGeo();
+        const cap = list.length * (cone ? (Math.ceil(spec.blobs * blobMul) + 10) : (cardsPer + 8)) + 8;
         const leafSet = new InstSet(leafGeo.clone(), leafMat, cap, key + '_leaf');
 
         for (const p of list) {
@@ -347,33 +350,33 @@
           }
 
           // 树冠
-          if (spec.leafGeo === 'cone') {
+          if (cone) {
             const nB = Math.max(3, Math.round(spec.blobs * blobMul));
             for (let b = 0; b < nB; b++) {
               const t = b / Math.max(1, nB - 1);
               leafSet.add({ x: p.x, y: gy + h * (0.3 + t * 0.72), z: p.z }, rng.next() * TAU, cr * (1.15 - t * 0.82), 1, 0);
             }
           } else {
-            const nB = Math.max(4, Math.round(spec.blobs * blobMul) + 2);
-            for (let b = 0; b < nB; b++) {
+            for (let k = 0; k < cardsPer; k++) {
               const az = rng.next() * TAU;
-              const rad = cr * Math.sqrt(rng.next()) * 0.92;
-              const bx = p.x + Math.cos(az) * rad, bz = p.z + Math.sin(az) * rad;
-              const by = baseY + rng.range(-0.5, 0.6) * ch * (willow ? 0.35 : 0.6);
-              const br = cr * rng.range(0.42, 0.72) * (willow ? 0.85 : 1);
-              leafSet.add({ x: bx, y: by, z: bz }, rng.next() * TAU, br, 1, 0);
-              const lit = leafSet.items[leafSet.items.length - 1];
-              lit.rx = rng.range(-0.3, 0.3); lit.rz = rng.range(-0.3, 0.3);
-              lit.sy = willow ? rng.range(0.7, 0.95) : rng.range(0.82, 1.05);
-              lit.sx = lit.sz = rng.range(0.92, 1.12);
+              const el = (rng.next() - 0.5) * 1.7;
+              const rr = Math.cbrt(rng.next());
+              const bx = p.x + Math.cos(az) * Math.cos(el) * cr * rr;
+              const bz = p.z + Math.sin(az) * Math.cos(el) * cr * rr;
+              const by = baseY + Math.sin(el) * ch * rr * 0.7 - (willow ? ch * 0.12 : 0);
+              const csz = cr * rng.range(0.55, 0.85) * (willow ? 0.9 : 1);
+              leafSet.add({ x: bx, y: by, z: bz }, rng.next() * TAU, csz, 1, 0);
+              const li = leafSet.items[leafSet.items.length - 1];
+              li.rx = rng.range(-0.7, 0.7); li.rz = rng.range(-0.7, 0.7);
+              li.sy = willow ? 0.85 : rng.range(0.85, 1.1);
             }
-            // 垂柳：额外挂几团下垂叶簇
+            // 垂柳：额外的下垂叶
             if (willow) {
-              for (let b = 0; b < 5; b++) {
+              for (let k = 0; k < 8; k++) {
                 const az = rng.next() * TAU, rad = cr * rng.range(0.5, 1.0);
-                leafSet.add({ x: p.x + Math.cos(az) * rad, y: gy + h * 0.6 + rng.range(-1.2, 0.4), z: p.z + Math.sin(az) * rad }, rng.next() * TAU, cr * rng.range(0.3, 0.45), 1, 0);
-                const lit = leafSet.items[leafSet.items.length - 1];
-                lit.sy = 0.6; lit.sx = lit.sz = 1.15;
+                leafSet.add({ x: p.x + Math.cos(az) * rad, y: gy + h * 0.6 + rng.range(-1.4, 0.3), z: p.z + Math.sin(az) * rad }, rng.next() * TAU, cr * rng.range(0.4, 0.6), 1, 0);
+                const li = leafSet.items[leafSet.items.length - 1];
+                li.rz = rng.range(-0.9, 0.9); li.sy = 0.85;
               }
             }
           }
@@ -763,6 +766,13 @@
     update(dt, camera) {
       MT.windTick(dt);   // 推进风摆时间
     }
+  }
+
+  /* 叶片卡片几何（居中，供树冠三维摆放） */
+  function leafCardGeo() {
+    const p1 = new THREE.PlaneGeometry(1, 1);
+    const p2 = new THREE.PlaneGeometry(1, 1); p2.rotateY(Math.PI / 2);
+    return mergeGeos([p1, p2]);
   }
 
   /* 交叉面片几何（草/芦苇） */

@@ -931,6 +931,21 @@
       }
     }),
 
+    /* ---- 叶片卡片（透明底；用于树冠"叶簇卡片"，边缘镂空成叶片剪影）---- */
+    leafCard: () => tex('leafCard', qsize(256), (ctx, s) => {
+      ctx.clearRect(0, 0, s, s);
+      for (let i = 0; i < 95; i++) {
+        const x = s * (0.14 + Math.random() * 0.72), y = s * (0.14 + Math.random() * 0.72);
+        const r = s * (0.07 + Math.random() * 0.09);
+        const a = Math.random() * Math.PI * 2;
+        const t = 198 + Math.random() * 57;
+        ctx.fillStyle = `rgba(${t | 0},${(t * 1.03) | 0},${(t * 0.9) | 0},0.95)`;
+        ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.6, a, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(120,130,110,0.5)'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.6, a, 0, Math.PI * 2); ctx.stroke();
+      }
+    }),
+
     /* ---- 野花（透明底；花瓣近白，便于按实例着色）---- */
     flower: () => tex('flower', qsize(128), (ctx, s) => {
       baseFill(ctx, s, [238, 238, 228], 0.10);
