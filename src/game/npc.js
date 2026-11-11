@@ -107,25 +107,23 @@
         ear.scale.set(0.55, 1.05, 0.9);
         this.body.add(ear);
       }
-      // 鼻子（楔形 + 鼻头）
-      const nose = new THREE.Mesh(new THREE.BoxGeometry(0.03 * s, 0.055 * s, 0.04 * s), skinMat);
-      nose.position.set(0, 1.535 * s, 0.116 * s); nose.rotation.x = rad(-8);
+      // 鼻子（柔和的球，不做成棱）
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.02 * s, 10, 8), skinMat);
+      nose.position.set(0, 1.53 * s, 0.118 * s); nose.scale.set(0.85, 1.1, 1.0);
       this.body.add(nose);
-      const noseTip = new THREE.Mesh(new THREE.SphereGeometry(0.015 * s, 8, 6), skinMat);
-      noseTip.position.set(0, 1.518 * s, 0.128 * s); this.body.add(noseTip);
       // 眼白 + 瞳孔 + 眉毛
       const scleraMat = new THREE.MeshStandardMaterial({ color: 0xf3efe6, roughness: 0.5 });
       const pupilMat = new THREE.MeshStandardMaterial({ color: 0x1e1811, roughness: 0.4 });
       const browMat = new THREE.MeshStandardMaterial({ color: 0x2a2320, roughness: 0.9 });
       for (const sx of [-1, 1]) {
-        const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.024 * s, 10, 8), scleraMat);
-        sclera.position.set(sx * 0.045 * s, 1.568 * s, 0.112 * s); sclera.scale.set(1, 0.82, 0.7);
+        const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.018 * s, 10, 8), scleraMat);
+        sclera.position.set(sx * 0.043 * s, 1.566 * s, 0.113 * s); sclera.scale.set(1, 0.82, 0.55);
         this.body.add(sclera);
-        const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.012 * s, 8, 6), pupilMat);
-        pupil.position.set(sx * 0.045 * s, 1.568 * s, 0.126 * s);
+        const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.0075 * s, 8, 6), pupilMat);
+        pupil.position.set(sx * 0.043 * s, 1.566 * s, 0.121 * s);
         this.body.add(pupil);
-        const brow = new THREE.Mesh(new THREE.BoxGeometry(0.05 * s, 0.011 * s, 0.012 * s), browMat);
-        brow.position.set(sx * 0.046 * s, 1.602 * s, 0.11 * s); brow.rotation.z = sx * rad(7);
+        const brow = new THREE.Mesh(new THREE.BoxGeometry(0.045 * s, 0.01 * s, 0.012 * s), browMat);
+        brow.position.set(sx * 0.044 * s, 1.594 * s, 0.108 * s); brow.rotation.z = sx * rad(7);
         this.body.add(brow);
       }
       // 嘴
@@ -201,14 +199,11 @@
         this.body.add(hat);
       } else if (!kid && style < 0.7) {
         const towelMat = new THREE.MeshStandardMaterial({ color: r.chance(0.5) ? 0xd8d4c8 : 0x9ab0c8, roughness: 0.95 });
-        // 搭在肩上的毛巾（卷 + 垂下的布角），不再是一块板
-        const roll = new THREE.Mesh(new THREE.CapsuleGeometry(0.05 * s, 0.26 * s, 4, 8), towelMat);
-        roll.rotation.z = Math.PI / 2; roll.rotation.y = rad(8);
-        roll.position.set(0.08 * s, 1.35 * s, 0.05 * s);
+        // 搭在肩上的毛巾（卷起的一条，不再是大板）
+        const roll = new THREE.Mesh(new THREE.CapsuleGeometry(0.035 * s, 0.22 * s, 4, 8), towelMat);
+        roll.rotation.z = Math.PI / 2; roll.rotation.y = rad(10);
+        roll.position.set(0.1 * s, 1.33 * s, 0.02 * s);
         this.body.add(roll);
-        const flap = new THREE.Mesh(new THREE.BoxGeometry(0.1 * s, 0.36 * s, 0.03 * s), towelMat);
-        flap.position.set(0.24 * s, 1.16 * s, 0.09 * s); flap.rotation.z = rad(-5);
-        this.body.add(flap);
       } else if (r.chance(0.5)) {
         const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.22 * s, 0.14 * s, 0.18 * s),
           new THREE.MeshStandardMaterial({ color: r.pick([0xb8342a, 0x3a6b9a, 0xd8b23c]), roughness: 0.95 }));
@@ -218,14 +213,14 @@
       // 农具（锄头 / 篮子）
       if (this.role === 'farmer' || this.role === 'miller') {
         const hoe = new THREE.Group();
-        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.022 * s, 0.022 * s, 1.5 * s, 6), MT.mat.wood());
-        shaft.position.y = 0.2 * s;
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.017 * s, 0.02 * s, 1.0 * s, 6), MT.mat.wood());
+        shaft.position.y = 0.1 * s;
         hoe.add(shaft);
-        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.07 * s, 0.1 * s, 0.22 * s), MT.mat.metal(0x6a7076, 0.5));
-        blade.position.y = -0.55 * s;
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.055 * s, 0.085 * s, 0.18 * s), MT.mat.metal(0x6a7076, 0.5));
+        blade.position.set(0, -0.4 * s, 0.05 * s);
         hoe.add(blade);
-        hoe.position.set(0.24 * s, 1.1 * s, 0.16 * s);
-        hoe.rotation.z = rad(-16);
+        hoe.position.set(0.33 * s, 1.02 * s, -0.04 * s);
+        hoe.rotation.z = rad(-26); hoe.rotation.x = rad(12);
         this.tool = hoe;
         this.body.add(hoe);
       }

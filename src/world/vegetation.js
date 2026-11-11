@@ -657,9 +657,13 @@
         if (T.slopeAt(x, z) > 0.55) continue;
         if (MT.inBuildZone(x, z, -0.5)) continue;
         if (r.chance(0.5)) continue;
-        set.add({ x, y: T.heightAt(x, z) + 0.1, z }, r.next() * TAU, r.range(0.35, 0.9), 1, 0);
-        const it = set.items[set.items.length - 1];
-        it.sy = r.range(0.6, 0.85); it.sx = it.sz = r.range(0.9, 1.2);
+        const y0 = T.heightAt(x, z);
+        const nLump = 3;   // 一丛由几团组成，不再是一个大球
+        for (let k = 0; k < nLump; k++) {
+          set.add({ x: x + r.range(-0.35, 0.35), y: y0 + 0.06, z: z + r.range(-0.35, 0.35) }, r.next() * TAU, r.range(0.28, 0.55), 1, 0);
+          const it = set.items[set.items.length - 1];
+          it.sy = r.range(0.6, 0.85); it.sx = it.sz = r.range(0.9, 1.2);
+        }
       }
       set.mesh.castShadow = true; set.mesh.receiveShadow = true;
       set.commit();
