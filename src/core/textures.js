@@ -722,9 +722,9 @@
         const lean = (Math.random() - 0.5) * s * 0.24;
         const k = 0.5 + Math.random() * 0.65;
         const g = ctx.createLinearGradient(x0, s, x0 + lean, s - h);
-        g.addColorStop(0, `rgba(${(58 * k) | 0},${(94 * k) | 0},${(40 * k) | 0},0.96)`);
-        g.addColorStop(0.55, `rgba(${(104 * k) | 0},${(150 * k) | 0},${(60 * k) | 0},0.96)`);
-        g.addColorStop(1, `rgba(${(150 * k) | 0},${(194 * k) | 0},${(86 * k) | 0},0.9)`);
+        g.addColorStop(0, `rgba(${(50 * k) | 0},${(84 * k) | 0},${(36 * k) | 0},0.96)`);
+        g.addColorStop(0.55, `rgba(${(92 * k) | 0},${(138 * k) | 0},${(56 * k) | 0},0.96)`);
+        g.addColorStop(1, `rgba(${(126 * k) | 0},${(168 * k) | 0},${(74 * k) | 0},0.9)`);
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.moveTo(x0 - w, s);
@@ -1059,16 +1059,17 @@
 
     /** 水面（简单标准材质 + 法线动画由 water 模块驱动） */
     water(color = 0x2f6b63, opacity = 0.86) {
-      const n = cloneTex('waterNormal', 26, 26);
+      const n = cloneTex('waterNormal', 22, 22);
       const m = new THREE.MeshStandardMaterial({
-        color, roughness: 0.16, metalness: 0.18,
-        normalMap: n, normalScale: new THREE.Vector2(0.55, 0.55),
+        color, roughness: 0.1, metalness: 0.22,
+        normalMap: n, normalScale: new THREE.Vector2(0.9, 0.9),
         transparent: true, opacity,
-        envMapIntensity: 1.35,
+        envMapIntensity: 1.9,
         // 一点自发光，保证没有环境贴图时水面也不会变成"黑洞"
-        emissive: new THREE.Color(color).multiplyScalar(0.12),
+        emissive: new THREE.Color(color).multiplyScalar(0.05),
       });
       m.userData.normalMapRef = n;
+      m.userData.baseColor = new THREE.Color(color);
       return m;
     },
 

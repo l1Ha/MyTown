@@ -448,7 +448,7 @@
       // 淮河
       const riverGeo = new THREE.PlaneGeometry(WORLD + 400, RIVER_HALF * 4.4, 1, 1);
       riverGeo.rotateX(-Math.PI / 2);
-      const riverMat = MT.mat.water(0x3c6b6a, 0.9);
+      const riverMat = MT.mat.water(0x2f6068, 0.86);
       const river = new THREE.Mesh(riverGeo, riverMat);
       river.position.set(0, WATER_Y, RIVER_Z);
       river.name = '淮河';
@@ -459,7 +459,7 @@
       for (const p of PONDS) {
         const g = new THREE.CircleGeometry(p.r * 1.25, 48);
         g.rotateX(-Math.PI / 2);
-        const m = MT.mat.water(0x35635f, 0.86);
+        const m = MT.mat.water(0x2e5d63, 0.8);
         const mesh = new THREE.Mesh(g, m);
         mesh.position.set(p.x, p.y, p.z);
         mesh.name = p.name;
@@ -537,8 +537,11 @@
       for (const w of this._waterMats) {
         const n = w.userData.normalMapRef;
         if (n) {
-          n.offset.x += dt * 0.017;
-          n.offset.y += dt * 0.011;
+          n.offset.x += dt * 0.03;
+          n.offset.y += dt * 0.021;
+          // 轻微起伏的波光（缓慢改法线强度）
+          const s = 0.8 + 0.15 * Math.sin(n.offset.x * 1.3);
+          if (w.normalScale) w.normalScale.set(s, s);
         }
       }
     }

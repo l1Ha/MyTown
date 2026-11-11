@@ -226,7 +226,7 @@
       let vBase = 0, rBase = 0, wBase = 0;
       const soilT = MT.texture.cloneTex('soil', 1, 1);
       const ridgeT = MT.texture.cloneTex('dirtRoad', 1, 1);
-      const waterMat = MT.mat.water(0x4e6b52, 0.72);
+      const waterMat = MT.mat.water(0x3f6360, 0.7);
 
       const sampleY = (x, z) => this.terrain.heightAt(x, z);
 
@@ -457,7 +457,7 @@
         wgeo.setAttribute('normal', new THREE.Float32BufferAttribute(wnor, 3));
         wgeo.setAttribute('uv', new THREE.Float32BufferAttribute(wuv, 2));
         wgeo.setIndex(widx);
-        const wmesh = new THREE.Mesh(wgeo, MT.mat.water(0x4a6b58, 0.75));
+        const wmesh = new THREE.Mesh(wgeo, MT.mat.water(0x3d6060, 0.72));
         wmesh.name = '渠水';
         wmesh.userData.noCollide = true;
         this.group.add(wmesh);
