@@ -269,6 +269,7 @@
 
       /* 7. 草丛 */
       this._buildGrass();
+      this._buildGroundCover();
       /* 8. 芦苇 */
       this._buildReeds();
       /* 9. 荷叶 */
@@ -468,12 +469,12 @@
         side: THREE.DoubleSide, roughness: 1.0, color: 0xffffff,
       });
       MT.windMaterial(mat, 0.07);
-      const N = Math.round((this.quality === 'low' ? 3000 : this.quality === 'medium' ? 7000 : 14000));
+      const N = Math.round((this.quality === 'low' ? 5000 : this.quality === 'medium' ? 12000 : 22000));
       const set = new InstSet(geo, mat, N, 'grass');
       let tries = 0;
-      while (set.items.length < N && tries < N * 6) {
+      while (set.items.length < N && tries < N * 8) {
         tries++;
-        const x = r.range(-200, 340), z = r.range(-190, 400);
+        const x = r.range(-470, 470), z = r.range(-455, 470);
         const dw = Math.hypot(x - MT.TerrainConst.VILLAGE.x, z - MT.TerrainConst.VILLAGE.z);
         const dW = Math.hypot(x - MT.TerrainConst.WA_CLUSTER.x, z - MT.TerrainConst.WA_CLUSTER.z);
         if (dw < 16 || dW < 12) continue;
@@ -491,6 +492,37 @@
       set.mesh.receiveShadow = true;
       set.commit();
       this.grassSet = set;
+      this.group.add(set.mesh);
+    }
+
+    /* ---------- 低矮地被（杂草 / 三叶，填草缝） ---------- */
+    _buildGroundCover() {
+      const N = this.quality === 'low' ? 0 : this.quality === 'medium' ? 6000 : 14000;
+      if (N === 0) return;
+      const r = this.rng, T = this.terrain;
+      const geo = crossedGeo(0.6, 0.32, 2);
+      const mat = new THREE.MeshStandardMaterial({
+        map: MT.tex.blade(), alphaTest: 0.42, transparent: false,
+        side: THREE.DoubleSide, roughness: 1.0, color: 0xffffff,
+      });
+      MT.windMaterial(mat, 0.04);
+      const set = new InstSet(geo, mat, N, 'cover');
+      let tries = 0;
+      while (set.items.length < N && tries < N * 6) {
+        tries++;
+        const x = r.range(-470, 470), z = r.range(-455, 470);
+        if (T.waterDepth(x, z) > 0.02) continue;
+        const s = T.surfaceAt(x, z);
+        if (s === 'cement' || s === 'mud') continue;
+        if (T.slopeAt(x, z) > 0.6) continue;
+        if (MT.inBuildZone(x, z, -1)) continue;
+        set.add({ x, y: T.heightAt(x, z) - 0.03, z }, r.next() * TAU, r.range(0.7, 1.6), 1, 0);
+        const it = set.items[set.items.length - 1];
+        it.rx = r.range(-0.15, 0.15); it.rz = r.range(-0.15, 0.15);
+      }
+      set.mesh.castShadow = false; set.mesh.receiveShadow = true;
+      set.commit();
+      this.coverSet = set;
       this.group.add(set.mesh);
     }
 
@@ -751,6 +783,11 @@
         const gc = { spring: 0xa8c46a, summer: 0x8fb454, autumn: 0xc0a858, winter: 0x9a8f70 }[key] || 0x8fb454;
         const cc = new THREE.Color(gc);
         this.grassSet.applySeason((it, col) => col.copy(cc).multiplyScalar(0.82 + ((it.ry * 31) % 1) * 0.34), (it) => (bare ? 0.55 : 1));
+      }
+      if (this.coverSet) {
+        const gc2 = { spring: 0xaac86e, summer: 0x8fbb58, autumn: 0xc6ae5c, winter: 0xa2987c }[key] || 0x8fbb58;
+        const cc2 = new THREE.Color(gc2);
+        this.coverSet.applySeason((it, col) => col.copy(cc2).multiplyScalar(0.8 + ((it.ry * 41) % 1) * 0.4), (it) => (bare ? 0.7 : 1));
       }
       if (this.reedSet) {
         const rc = { spring: 0x9ab060, summer: 0xa8b060, autumn: 0xd0b878, winter: 0xb0a488 }[key] || 0xa8b060;
