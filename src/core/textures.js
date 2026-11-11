@@ -715,16 +715,16 @@
     /* ---- 草叶（带透明通道，用于草地/芦苇）---- */
     blade: () => tex('blade', qsize(256), (ctx, s) => {
       baseFill(ctx, s, [86, 118, 48], 0.28);
-      for (let i = 0; i < 18; i++) {
+      for (let i = 0; i < 24; i++) {
         const x0 = s * (0.05 + Math.random() * 0.9);
-        const h = s * (0.4 + Math.random() * 0.58);
-        const w = s * (0.016 + Math.random() * 0.024);
+        const h = s * (0.42 + Math.random() * 0.56);
+        const w = s * (0.03 + Math.random() * 0.035);
         const lean = (Math.random() - 0.5) * s * 0.24;
         const k = 0.5 + Math.random() * 0.65;
         const g = ctx.createLinearGradient(x0, s, x0 + lean, s - h);
-        g.addColorStop(0, `rgba(${(40 * k) | 0},${(68 * k) | 0},${(28 * k) | 0},0.96)`);
-        g.addColorStop(0.55, `rgba(${(92 * k) | 0},${(136 * k) | 0},${(52 * k) | 0},0.96)`);
-        g.addColorStop(1, `rgba(${(140 * k) | 0},${(184 * k) | 0},${(78 * k) | 0},0.9)`);
+        g.addColorStop(0, `rgba(${(58 * k) | 0},${(94 * k) | 0},${(40 * k) | 0},0.96)`);
+        g.addColorStop(0.55, `rgba(${(104 * k) | 0},${(150 * k) | 0},${(60 * k) | 0},0.96)`);
+        g.addColorStop(1, `rgba(${(150 * k) | 0},${(194 * k) | 0},${(86 * k) | 0},0.9)`);
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.moveTo(x0 - w, s);

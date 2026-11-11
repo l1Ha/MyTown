@@ -118,11 +118,11 @@
       const pupilMat = new THREE.MeshStandardMaterial({ color: 0x1e1811, roughness: 0.4 });
       const browMat = new THREE.MeshStandardMaterial({ color: 0x2a2320, roughness: 0.9 });
       for (const sx of [-1, 1]) {
-        const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.023 * s, 10, 8), scleraMat);
-        sclera.position.set(sx * 0.045 * s, 1.572 * s, 0.1 * s); sclera.scale.set(1, 0.82, 0.62);
+        const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.024 * s, 10, 8), scleraMat);
+        sclera.position.set(sx * 0.045 * s, 1.568 * s, 0.112 * s); sclera.scale.set(1, 0.82, 0.7);
         this.body.add(sclera);
-        const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.011 * s, 8, 6), pupilMat);
-        pupil.position.set(sx * 0.045 * s, 1.572 * s, 0.115 * s);
+        const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.012 * s, 8, 6), pupilMat);
+        pupil.position.set(sx * 0.045 * s, 1.568 * s, 0.126 * s);
         this.body.add(pupil);
         const brow = new THREE.Mesh(new THREE.BoxGeometry(0.05 * s, 0.011 * s, 0.012 * s), browMat);
         brow.position.set(sx * 0.046 * s, 1.602 * s, 0.11 * s); brow.rotation.z = sx * rad(7);
@@ -137,8 +137,8 @@
       const style2 = (this.role === 'child') ? 'bowl' : (old ? 'short' : (r.chance(0.45) ? 'bowl' : (r.chance(0.5) ? 'bun' : 'short')));
       this.hairStyle = style2;
       if (style2 !== 'bald') {
-        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.132 * s, 16, 12, 0, TAU, 0, Math.PI * 0.56), hairMat);
-        cap.position.y = 1.552 * s; cap.scale.set(1.0, 1.03, 1.06); cap.rotation.x = rad(4);
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.132 * s, 16, 12, 0, TAU, 0, Math.PI * 0.42), hairMat);
+        cap.position.y = 1.566 * s; cap.scale.set(1.0, 0.92, 1.05); cap.rotation.x = rad(4);
         this.body.add(cap);
         // 后脑发量（不遮脸）
         const back = new THREE.Mesh(new THREE.SphereGeometry(0.125 * s, 14, 12), hairMat);
@@ -200,14 +200,15 @@
         hat.position.y = 1.63 * s; hat.castShadow = true;
         this.body.add(hat);
       } else if (!kid && style < 0.7) {
-        const towel = new THREE.Mesh(new THREE.BoxGeometry(0.24 * s, 0.1 * s, 0.12 * s),
-          new THREE.MeshStandardMaterial({ color: r.chance(0.5) ? 0xd8d4c8 : 0x9ab0c8, roughness: 0.95 }));
-        towel.position.set(0, 1.42 * s, -0.02 * s);
-        this.body.add(towel);
-        const shoulder = new THREE.Mesh(new THREE.BoxGeometry(0.08 * s, 0.42 * s, 0.03 * s),
-          towel.material);
-        shoulder.position.set(0.16 * s, 1.18 * s, 0.1 * s);
-        this.body.add(shoulder);
+        const towelMat = new THREE.MeshStandardMaterial({ color: r.chance(0.5) ? 0xd8d4c8 : 0x9ab0c8, roughness: 0.95 });
+        // 搭在肩上的毛巾（卷 + 垂下的布角），不再是一块板
+        const roll = new THREE.Mesh(new THREE.CapsuleGeometry(0.05 * s, 0.26 * s, 4, 8), towelMat);
+        roll.rotation.z = Math.PI / 2; roll.rotation.y = rad(8);
+        roll.position.set(0.08 * s, 1.35 * s, 0.05 * s);
+        this.body.add(roll);
+        const flap = new THREE.Mesh(new THREE.BoxGeometry(0.1 * s, 0.36 * s, 0.03 * s), towelMat);
+        flap.position.set(0.24 * s, 1.16 * s, 0.09 * s); flap.rotation.z = rad(-5);
+        this.body.add(flap);
       } else if (r.chance(0.5)) {
         const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.22 * s, 0.14 * s, 0.18 * s),
           new THREE.MeshStandardMaterial({ color: r.pick([0xb8342a, 0x3a6b9a, 0xd8b23c]), roughness: 0.95 }));
