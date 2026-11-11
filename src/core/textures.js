@@ -1216,5 +1216,6 @@
   MT.texture = {
     preload, tex, dataTex, cloneTex, makeCanvas, grain, splotch, cache,
     textTex, textMat, plaque, CN_FONT, CN_FONT_SERIF,
+    nrm, bumpNormal, roughMap,
   };
 })();

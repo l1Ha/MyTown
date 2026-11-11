@@ -16,6 +16,7 @@
     if (!mat || mat.userData._wind) return mat;
     mat.userData._wind = true;
     const prev = mat.onBeforeCompile;
+    mat.customProgramCacheKey = function () { return 'mytown-wind'; };   // 同一套风摆程序变体
     mat.onBeforeCompile = function (shader) {
       if (prev) prev(shader);
       shader.uniforms.uTime = MT._windU;
@@ -37,6 +38,12 @@
     return mat;
   };
   MT.windTick = function (dt) { MT._windU.value += dt; };
+  /** 与地面植物同款风摆的"阴影深度材质"，让草/芦苇的影子也随风摆 */
+  MT.windDepthMaterial = function (alphaMap, alphaTest, strength) {
+    const dm = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: alphaMap || null, alphaTest: alphaTest || 0 });
+    MT.windMaterial(dm, strength);
+    return dm;
+  };
 
   /* ---------------- 树种表 ---------------- */
   const SPECIES = {
@@ -319,14 +326,18 @@
           ? new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, map: MT.tex.leafCluster() })
           : new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, map: MT.tex.leafCard(), alphaTest: 0.45, side: THREE.DoubleSide });
         if (!cone) MT.windMaterial(leafMat, 0.07);
+        // 树冠自遮蔽凹凸（让树冠"像一簇簇叶子"而非光滑壳）
+        if (MT.texture.nrm) {
+          const nm = MT.texture.nrm(cone ? 'leafCluster' : 'leafCard', 1, 1);
+          if (nm) { leafMat.normalMap = nm; leafMat.normalScale = new THREE.Vector2(0.7, 0.7); }
+        }
         const leafGeo = cone ? coneGeo : leafCardGeo();
         const cap = list.length * (cone ? (Math.ceil(spec.blobs * blobMul) + 10) : (cardsPer + 8)) + 8;
         const leafSet = new InstSet(leafGeo.clone(), leafMat, cap, key + '_leaf');
         // 内芯团块（不透明），保证树冠有实体感
-        const coreSet = cone ? null : new InstSet(
-          this._lumpyGeo(blobDetail, key.length * 13 + 5),
-          new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, map: MT.tex.leafCluster() }),
-          list.length * 6 + 4, key + '_core');
+        const coreMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, map: MT.tex.leafCluster() });
+        if (MT.texture.nrm) { const nm = MT.texture.nrm('leafCluster', 1, 1); if (nm) { coreMat.normalMap = nm; coreMat.normalScale = new THREE.Vector2(0.8, 0.8); } }
+        const coreSet = cone ? null : new InstSet(this._lumpyGeo(blobDetail, key.length * 13 + 5), coreMat, list.length * 6 + 4, key + '_core');
 
         for (const p of list) {
           const h = lerp(spec.h[0], spec.h[1], rng.next()) * p.s;
@@ -361,6 +372,7 @@
             for (let b = 0; b < nB; b++) {
               const t = b / Math.max(1, nB - 1);
               leafSet.add({ x: p.x, y: gy + h * (0.3 + t * 0.72), z: p.z }, rng.next() * TAU, cr * (1.15 - t * 0.82), 1, 0);
+              leafSet.items[leafSet.items.length - 1].ao = 0.62 + 0.38 * t;
             }
           } else {
             for (let k = 0; k < cardsPer; k++) {
@@ -375,6 +387,7 @@
               const li = leafSet.items[leafSet.items.length - 1];
               li.rx = rng.range(-0.7, 0.7); li.rz = rng.range(-0.7, 0.7);
               li.sy = willow ? 0.85 : rng.range(0.85, 1.1);
+              li.ao = 0.5 + 0.5 * rr;      // 越靠冠心越暗（树冠自遮蔽）
             }
             // 垂柳：额外的下垂叶
             if (willow) {
@@ -382,7 +395,7 @@
                 const az = rng.next() * TAU, rad = cr * rng.range(0.5, 1.0);
                 leafSet.add({ x: p.x + Math.cos(az) * rad, y: gy + h * 0.6 + rng.range(-1.4, 0.3), z: p.z + Math.sin(az) * rad }, rng.next() * TAU, cr * rng.range(0.4, 0.6), 1, 0);
                 const li = leafSet.items[leafSet.items.length - 1];
-                li.rz = rng.range(-0.9, 0.9); li.sy = 0.85;
+                li.rz = rng.range(-0.9, 0.9); li.sy = 0.85; li.ao = 0.85;
               }
             }
             // 内芯团块
@@ -393,6 +406,7 @@
                 y: baseY + Math.sin(ce) * ch * crr * 0.6,
                 z: p.z + Math.sin(ca) * cr * crr,
               }, rng.next() * TAU, cr * rng.range(0.5, 0.68), 1, 0);
+              coreSet.items[coreSet.items.length - 1].ao = 0.45 + 0.55 * crr;
             }
           }
 
@@ -411,8 +425,11 @@
           dm.scale.set(it.trunkS.r, it.trunkS.h, it.trunkS.r);
           dm.updateMatrix();
           trunkSet.mesh.setMatrixAt(i, dm.matrix);
+          const tk = 0.82 + rng.next() * 0.36;   // 每棵树的树皮色调略有差异
+          trunkSet.mesh.setColorAt(i, trunkSet.tmpC.setRGB(tk, tk * 0.97, tk * 0.93));
         }
         trunkSet.mesh.instanceMatrix.needsUpdate = true;
+        if (trunkSet.mesh.instanceColor) trunkSet.mesh.instanceColor.needsUpdate = true;
         branchSet.commit();
         leafSet.commit();
         if (coreSet) { coreSet.commit(); coreSet.mesh.castShadow = true; coreSet.mesh.receiveShadow = true; this.group.add(coreSet.mesh); }
@@ -488,8 +505,11 @@
         const gi = set.items[set.items.length - 1];
         gi.rx = r.range(-0.13, 0.13); gi.rz = r.range(-0.13, 0.13);
       }
-      set.mesh.castShadow = false;
       set.mesh.receiveShadow = true;
+      if (this.quality === 'high' || this.quality === 'ultra') {
+        set.mesh.castShadow = true;
+        set.mesh.customDepthMaterial = MT.windDepthMaterial(MT.tex.blade(), 0.42, 0.07);
+      } else set.mesh.castShadow = false;
       set.commit();
       this.grassSet = set;
       this.group.add(set.mesh);
@@ -520,7 +540,11 @@
         const it = set.items[set.items.length - 1];
         it.rx = r.range(-0.15, 0.15); it.rz = r.range(-0.15, 0.15);
       }
-      set.mesh.castShadow = false; set.mesh.receiveShadow = true;
+      set.mesh.receiveShadow = true;
+      if (this.quality === 'high' || this.quality === 'ultra') {
+        set.mesh.castShadow = true;
+        set.mesh.customDepthMaterial = MT.windDepthMaterial(MT.tex.blade(), 0.42, 0.04);
+      } else set.mesh.castShadow = false;
       set.commit();
       this.coverSet = set;
       this.group.add(set.mesh);
@@ -555,8 +579,11 @@
         if (w ? h > w.y + 1.6 : h > 6.5) continue; // 太高（不是滩涂）
         set.add({ x, y: h - 0.15, z }, r.next() * TAU, r.range(0.7, 1.35), 1, 0);
       }
-      set.mesh.castShadow = false;
       set.mesh.receiveShadow = true;
+      if (this.quality === 'high' || this.quality === 'ultra') {
+        set.mesh.castShadow = true;
+        set.mesh.customDepthMaterial = MT.windDepthMaterial(MT.tex.reed(), 0.4, 0.1);
+      } else set.mesh.castShadow = false;
       set.commit();
       this.reedSet = set;
       this.group.add(set.mesh);
@@ -618,6 +645,7 @@
       const r = this.rng, T = this.terrain;
       const geo = this._lumpyGeo(this.quality === 'high' ? 1 : 0, 21);
       const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1.0, map: MT.tex.leafCluster() });
+      if (MT.texture.nrm) { const bnm = MT.texture.nrm('leafCluster', 1, 1); if (bnm) { mat.normalMap = bnm; mat.normalScale = new THREE.Vector2(0.8, 0.8); } }
       const set = new InstSet(geo, mat, N, 'bush');
       let tries = 0;
       while (set.items.length < N && tries < N * 8) {
@@ -705,6 +733,7 @@
       }
       // 树冠（多个球）
       const leafMat = new THREE.MeshStandardMaterial({ color: 0x4f8a3a, roughness: 0.95, map: MT.tex.leafCluster() });
+      if (MT.texture.nrm) { const gnm = MT.texture.nrm('leafCluster', 1, 1); if (gnm) { leafMat.normalMap = gnm; leafMat.normalScale = new THREE.Vector2(0.8, 0.8); } }
       const blobs = [];
       for (let i = 0; i < 14; i++) {
         const a = r.next() * TAU;
@@ -768,14 +797,14 @@
         const c = new THREE.Color(baseColor);
         t.leaf.applySeason((it, col) => {
           col.copy(c);
-          // 每棵树轻微色差
-          const k = 0.86 + ((it.ry * 7919) % 1) * 0.3;
+          // 每棵树轻微色差 + 树冠自遮蔽（内暗外亮）
+          const k = (0.86 + ((it.ry * 7919) % 1) * 0.3) * (it.ao === undefined ? 1 : it.ao);
           col.multiplyScalar(k);
           return col;
         }, (it) => (bare ? (spec.leafGeo === 'cone' ? 0.95 : 0.16) : 1));
         t.leaf.mesh.visible = !bare || spec.leafGeo === 'cone';
         if (t.core) {
-          t.core.applySeason((it, col) => { col.copy(c); col.multiplyScalar(0.86 + ((it.ry * 7919) % 1) * 0.3); return col; }, (it) => (bare ? 0.16 : 1));
+          t.core.applySeason((it, col) => { col.copy(c); col.multiplyScalar((0.86 + ((it.ry * 7919) % 1) * 0.3) * (it.ao === undefined ? 1 : it.ao)); return col; }, (it) => (bare ? 0.16 : 1));
           t.core.mesh.visible = !bare;
         }
       }
