@@ -48,25 +48,25 @@
   /* ---------------- 树种表 ---------------- */
   const SPECIES = {
     poplar: { // 杨树：淮河两岸最常见的行道树、防护林
-      name: '杨树', h: [13, 20], trunkR: [0.16, 0.26], crownR: [1.6, 2.7], crownH: [7, 12],
-      blobs: 4, leafGeo: 'ico', spring: 0x9ec46a, summer: 0x5f9440, autumn: 0xd8c05a, winter: 0x8a7c60,
+      name: '杨树', h: [10.5, 16], trunkR: [0.16, 0.26], crownR: [2.3, 3.5], crownH: [5, 8],
+      blobs: 5, leafGeo: 'ico', spring: 0x9ec46a, summer: 0x5f9440, autumn: 0xd8c05a, winter: 0x8a7c60,
       trunk: 0x8c8074, collider: true,
     },
     willow: { // 柳树：水边、塘埂
-      name: '柳树', h: [7, 11], trunkR: [0.18, 0.3], crownR: [2.6, 4.2], crownH: [3.5, 6],
-      blobs: 6, leafGeo: 'ico', droop: true,
+      name: '柳树', h: [6.5, 9.5], trunkR: [0.18, 0.3], crownR: [2.9, 4.5], crownH: [3.2, 5.2],
+      blobs: 7, leafGeo: 'ico', droop: true,
       spring: 0xbcd47a, summer: 0x7fae54, autumn: 0xd0b45e, winter: 0x8f8467,
       trunk: 0x6f6455,
     },
     locust: { // 槐树
-      name: '槐树', h: [9, 14], trunkR: [0.24, 0.4], crownR: [3, 4.6], crownH: [4.5, 7.5],
-      blobs: 5, leafGeo: 'ico',
+      name: '槐树', h: [7.5, 11], trunkR: [0.24, 0.4], crownR: [3.2, 4.8], crownH: [3.8, 5.8],
+      blobs: 6, leafGeo: 'ico',
       spring: 0x8fbf60, summer: 0x4f8a3a, autumn: 0xc9a848, winter: 0x7d7259,
       trunk: 0x5d5248, collider: true,
     },
     paulownia: { // 泡桐
-      name: '泡桐', h: [10, 13], trunkR: [0.26, 0.42], crownR: [3.2, 4.8], crownH: [4, 7],
-      blobs: 5, leafGeo: 'ico',
+      name: '泡桐', h: [8, 11.5], trunkR: [0.26, 0.42], crownR: [3.2, 4.8], crownH: [3.6, 5.6],
+      blobs: 6, leafGeo: 'ico',
       spring: 0xa8c878, summer: 0x5f9a48, autumn: 0xc0a24c, winter: 0x7a7058,
       trunk: 0x6d6152,
     },
@@ -316,12 +316,14 @@
         const list = byKey[key];
         // 树干 / 树枝（同一材质）
         const barkTex = MT.texture.cloneTex('bark', 1, Math.max(2, Math.round(spec.h[1] * 0.45)));
-        const trunkMat = new THREE.MeshStandardMaterial({ color: spec.trunk, roughness: 0.95, map: barkTex || null });
+        // 树皮贴图本身偏暗，颜色要往白里提，否则乘出来是黑的
+        const trunkTint = new THREE.Color(spec.trunk).lerp(new THREE.Color(0xffffff), 0.62);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: trunkTint, roughness: 0.95, map: barkTex || null });
         const trunkSet = new InstSet(trunkGeo, trunkMat, list.length, key + '_trunk');
         const branchSet = new InstSet(branchGeo, trunkMat, list.length * 12, key + '_branch');
         // 树冠
         const cone = spec.leafGeo === 'cone';
-        const cardsPer = cone ? 0 : (this.quality === 'low' ? 8 : this.quality === 'medium' ? 12 : 18);
+        const cardsPer = cone ? 0 : (this.quality === 'low' ? 10 : this.quality === 'medium' ? 18 : 30);
         const leafMat = cone
           ? new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, map: MT.tex.leafCluster() })
           : new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, map: MT.tex.leafCard(), alphaTest: 0.45, side: THREE.DoubleSide });
@@ -332,7 +334,7 @@
           if (nm) { leafMat.normalMap = nm; leafMat.normalScale = new THREE.Vector2(0.7, 0.7); }
         }
         const leafGeo = cone ? coneGeo : leafCardGeo();
-        const cap = list.length * (cone ? (Math.ceil(spec.blobs * blobMul) + 10) : (cardsPer + 8)) + 8;
+        const cap = list.length * (cone ? (Math.ceil(spec.blobs * blobMul) + 10) : (cardsPer + 14)) + 8;
         const leafSet = new InstSet(leafGeo.clone(), leafMat, cap, key + '_leaf');
         // 内芯团块（不透明），保证树冠有实体感
         const coreMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, map: MT.tex.leafCluster() });
@@ -351,18 +353,25 @@
           const baseY = gy + h * 0.6 + ch * 0.45;
           const willow = !!spec.droop;
 
-          // 树枝：中上部向外分叉
+          // 树枝：从中上部向外分叉（偏移方向必须与旋转后的 +Y 方向一致，否则会悬空）
+          const tips = [];
           if (spec.leafGeo !== 'cone') {
-            const nBr = Math.max(3, Math.round((3 + spec.blobs * 0.6) * (this.quality === 'low' ? 0.6 : 1)));
+            const nBr = Math.max(4, Math.round((4 + spec.blobs * 0.8) * (this.quality === 'low' ? 0.6 : 1)));
             for (let b = 0; b < nBr; b++) {
               const az = rng.next() * TAU;
-              const bh = h * rng.range(0.5, 0.72);
-              const len = cr * rng.range(0.45, 0.75) + rng.range(0.6, 1.4);
-              const tilt = rng.range(48, 72) * Math.PI / 180;
-              branchSet.add({ x: p.x + Math.cos(az) * tr * 0.4, y: gy + bh, z: p.z + Math.sin(az) * tr * 0.4 }, az, 1, 1, 0);
+              const bh = h * rng.range(0.42, 0.66);
+              const len = cr * rng.range(0.38, 0.62) + rng.range(0.5, 0.9);
+              const tilt = rng.range(48, 68) * Math.PI / 180;
+              branchSet.add({ x: p.x + Math.sin(az) * tr * 0.25, y: gy + bh, z: p.z + Math.cos(az) * tr * 0.25 }, az, 1, 1, 0);
               const bit = branchSet.items[branchSet.items.length - 1];
               bit.rx = tilt; bit.ry = az;
-              bit.sx = tr * rng.range(0.5, 0.8); bit.sz = bit.sx; bit.sy = len;
+              bit.sx = tr * rng.range(0.4, 0.62); bit.sz = bit.sx; bit.sy = len;
+              // 枝梢位置：后面补叶卡片，盖住"光秃秃的树枝尖"
+              tips.push({
+                x: p.x + Math.sin(az) * Math.sin(tilt) * len * 0.92,
+                y: gy + bh + Math.cos(tilt) * len * 0.92,
+                z: p.z + Math.cos(az) * Math.sin(tilt) * len * 0.92,
+              });
             }
           }
 
@@ -382,7 +391,7 @@
               const bx = p.x + Math.cos(az) * Math.cos(el) * cr * rr;
               const bz = p.z + Math.sin(az) * Math.cos(el) * cr * rr;
               const by = baseY + Math.sin(el) * ch * rr * 0.7 - (willow ? ch * 0.12 : 0);
-              const csz = cr * rng.range(0.55, 0.85) * (willow ? 0.9 : 1);
+              const csz = cr * rng.range(0.3, 0.48) * (willow ? 0.85 : 1);
               leafSet.add({ x: bx, y: by, z: bz }, rng.next() * TAU, csz, 1, 0);
               const li = leafSet.items[leafSet.items.length - 1];
               li.rx = rng.range(-0.7, 0.7); li.rz = rng.range(-0.7, 0.7);
@@ -398,15 +407,22 @@
                 li.rz = rng.range(-0.9, 0.9); li.sy = 0.85; li.ao = 0.85;
               }
             }
-            // 内芯团块
-            for (let k = 0; k < 4; k++) {
-              const ca = rng.next() * TAU, ce = (rng.next() - 0.5) * 1.4, crr = Math.cbrt(rng.next()) * 0.6;
+            // 枝梢补叶：让树冠外缘有叶子，不是一根根光树枝
+            for (const tip of tips) {
+              leafSet.add({ x: tip.x, y: tip.y, z: tip.z }, rng.next() * TAU, cr * rng.range(0.32, 0.46), 1, 0);
+              const li = leafSet.items[leafSet.items.length - 1];
+              li.rx = rng.range(-0.5, 0.5); li.rz = rng.range(-0.5, 0.5);
+              li.sy = rng.range(0.85, 1.1); li.ao = 0.9;
+            }
+            // 内芯团块（小一些、多一些，避免大块多面体）
+            for (let k = 0; k < 6; k++) {
+              const ca = rng.next() * TAU, ce = (rng.next() - 0.5) * 1.4, crr = Math.cbrt(rng.next()) * 0.58;
               coreSet.add({
                 x: p.x + Math.cos(ca) * cr * crr,
                 y: baseY + Math.sin(ce) * ch * crr * 0.6,
                 z: p.z + Math.sin(ca) * cr * crr,
-              }, rng.next() * TAU, cr * rng.range(0.5, 0.68), 1, 0);
-              coreSet.items[coreSet.items.length - 1].ao = 0.45 + 0.55 * crr;
+              }, rng.next() * TAU, cr * rng.range(0.4, 0.56), 1, 0);
+              coreSet.items[coreSet.items.length - 1].ao = 0.42 + 0.58 * crr;
             }
           }
 
@@ -714,44 +730,110 @@
       const g = new THREE.Group();
       const gy = this.terrain.heightAt(x, z);
       g.position.set(x, gy, z);
-      const m = MT.M();
-      const H = 13.5, tr = 0.72;
-      // 树根盘
-      const base = MT.Build.cyl(tr * 1.5, tr * 2.2, 0.7, new THREE.MeshStandardMaterial({ color: 0x6a5c4c, roughness: 1 }), 12);
-      base.position.y = 0.3; g.add(base);
+      const H = 12.5, tr = 0.68;
+      const trunkTint = new THREE.Color(spec.trunk).lerp(new THREE.Color(0xffffff), 0.58);
+      const trunkMat = new THREE.MeshStandardMaterial({ color: trunkTint, roughness: 1, map: MT.tex.bark() });
+      const rootMat = new THREE.MeshStandardMaterial({ color: 0x6a5844, roughness: 1 });
+
+      // 树根：几条斜插进土里的粗根（不再是一块灰色底座）
+      const up = new THREE.Vector3(0, 1, 0);
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU + r.range(-0.25, 0.25);
+        const dir = new THREE.Vector3(Math.cos(a), -0.55, Math.sin(a)).normalize();
+        const len = r.range(1.5, 2.4);
+        const root = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.26, len, 7), rootMat);
+        root.quaternion.setFromUnitVectors(up, dir);
+        root.position.set(dir.x * len * 0.35, 0.55 + dir.y * len * 0.35, dir.z * len * 0.35);
+        root.castShadow = true; root.receiveShadow = true;
+        g.add(root);
+      }
+
       // 主干
-      const trunkMat = new THREE.MeshStandardMaterial({ color: spec.trunk, roughness: 1, map: MT.tex.bark() });
       const trunk = new THREE.Mesh(this._trunkGeo(), trunkMat);
       trunk.scale.set(tr, H, tr);
-      trunk.position.y = 0.4; trunk.castShadow = true; trunk.receiveShadow = true;
+      trunk.position.y = 0.3; trunk.castShadow = true; trunk.receiveShadow = true;
       g.add(trunk);
-      // 侧枝
-      for (let i = 0; i < 5; i++) {
-        const a = (i / 5) * TAU + r.range(-0.3, 0.3);
-        const len = r.range(3.2, 5.4);
-        const br = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.3, len, 7), trunkMat);
-        br.position.set(Math.cos(a) * len * 0.36, H * 0.62 + r.range(-0.6, 1.4), Math.sin(a) * len * 0.36);
-        br.rotation.set(Math.cos(a) * rad(56), 0, -Math.sin(a) * rad(56));
+
+      // 侧枝：从树干上分两层伸出，根部与主干相接
+      const addBranch = (az, tilt, len, y0, r0, r1) => {
+        const dir = new THREE.Vector3(
+          Math.sin(az) * Math.sin(tilt),
+          Math.cos(tilt),
+          Math.cos(az) * Math.sin(tilt)
+        ).normalize();
+        const br = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, len, 7), trunkMat);
+        br.quaternion.setFromUnitVectors(up, dir);
+        br.position.set(dir.x * len * 0.5, y0 + dir.y * len * 0.5, dir.z * len * 0.5);
         br.castShadow = true;
         g.add(br);
+      };
+      for (let i = 0; i < 6; i++) {
+        addBranch(
+          (i / 6) * TAU + r.range(-0.25, 0.25),
+          r.range(58, 76) * Math.PI / 180,
+          r.range(3.6, 5.6),
+          H * r.range(0.52, 0.66),
+          tr * 0.34, 0.08
+        );
       }
-      // 树冠（多个球）
-      const leafMat = new THREE.MeshStandardMaterial({ color: 0x4f8a3a, roughness: 0.95, map: MT.tex.leafCluster() });
-      if (MT.texture.nrm) { const gnm = MT.texture.nrm('leafCluster', 1, 1); if (gnm) { leafMat.normalMap = gnm; leafMat.normalScale = new THREE.Vector2(0.8, 0.8); } }
+      for (let i = 0; i < 3; i++) {
+        addBranch(
+          (i / 3) * TAU + r.range(0.2, 0.8),
+          r.range(30, 48) * Math.PI / 180,
+          r.range(2.6, 3.8),
+          H * r.range(0.72, 0.8),
+          tr * 0.22, 0.06
+        );
+      }
+
+      // 树冠：小团块 + 叶卡片（团块不再是几个大绿球）
       const blobs = [];
-      for (let i = 0; i < 14; i++) {
+      const baseCol = new THREE.Color(0x4f8a3a);
+      for (let i = 0; i < 20; i++) {
         const a = r.next() * TAU;
-        const d = Math.sqrt(r.next()) * 4.8;
-        const sz = r.range(2.0, 3.5);
-        const bg = this._lumpyGeo(1, 40 + i);
-        bg.scale(sz * r.range(0.9, 1.15), sz * r.range(0.85, 1.05), sz * r.range(0.9, 1.15));
-        const blob = new THREE.Mesh(bg, leafMat);
-        blob.position.set(Math.cos(a) * d, H * 0.86 + r.range(-1.8, 2.2), Math.sin(a) * d);
+        const d = Math.sqrt(r.next()) * 4.4;
+        const sz = r.range(1.25, 2.3);
+        const bg = this._lumpyGeo(2, 40 + i);
+        bg.scale(sz * r.range(0.9, 1.15), sz * r.range(0.8, 1.0), sz * r.range(0.9, 1.15));
+        const bm = new THREE.MeshStandardMaterial({
+          color: baseCol.clone().multiplyScalar(r.range(0.78, 1.06)),
+          roughness: 0.95, map: MT.tex.leafCluster(),
+        });
+        if (MT.texture.nrm) { const nm = MT.texture.nrm('leafCluster', 1, 1); if (nm) { bm.normalMap = nm; bm.normalScale = new THREE.Vector2(0.8, 0.8); } }
+        const blob = new THREE.Mesh(bg, bm);
+        blob.position.set(Math.cos(a) * d, H * 0.8 + r.range(-1.7, 2.0), Math.sin(a) * d);
+        blob.userData.tint = r.range(0.78, 1.06);
         blob.castShadow = true; blob.receiveShadow = true;
         blobs.push(blob);
         g.add(blob);
       }
-      g.userData.bigTree = { blobs, leafMat, trunk };
+
+      // 叶卡片：给树冠补外轮廓和叶簇细节
+      const cardMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff, roughness: 0.9, map: MT.tex.leafCard(), alphaTest: 0.45, side: THREE.DoubleSide,
+      });
+      MT.windMaterial(cardMat, 0.055);
+      const cards = new InstSet(leafCardGeo(), cardMat, 72, 'bigtree_leaf');
+      for (let i = 0; i < 64; i++) {
+        const a = r.next() * TAU;
+        const d = Math.sqrt(r.next()) * 5.0;
+        const s = r.range(1.0, 1.8);
+        cards.add(
+          { x: Math.cos(a) * d, y: H * 0.8 + r.range(-2.1, 2.4), z: Math.sin(a) * d },
+          r.next() * TAU, s, 1, 0
+        );
+        const it = cards.items[cards.items.length - 1];
+        it.rx = r.range(-0.6, 0.6); it.rz = r.range(-0.6, 0.6);
+        it.sy = r.range(0.85, 1.1);
+        it.col = baseCol.clone().multiplyScalar(0.85 + r.next() * 0.35);
+      }
+      cards.commit();
+      for (let i = 0; i < cards.items.length; i++) cards.mesh.setColorAt(i, cards.items[i].col);
+      if (cards.mesh.instanceColor) cards.mesh.instanceColor.needsUpdate = true;
+      cards.mesh.castShadow = true; cards.mesh.receiveShadow = true;
+      g.add(cards.mesh);
+
+      g.userData.bigTree = { blobs, leafMat: blobs[0].material, cardMat, cards, trunk };
       MT.colliders.push({ x, y: gy + H / 2, z, hw: tr * 1.1, hh: H / 2 + 0.5, hd: tr * 1.1, ry: 0, cos: 1, sin: 0, active: true });
       this.landmarks.push(g);
       return g;
@@ -847,8 +929,14 @@
         const ud = g.userData.bigTree;
         if (!ud) continue;
         const c = new THREE.Color(season === 'winter' ? 0x7d7259 : season === 'autumn' ? 0xc9a848 : season === 'spring' ? 0x8fbf60 : 0x4f8a3a);
-        ud.leafMat.color.copy(c);
-        ud.blobs.forEach((b) => { b.scale.setScalar(bare ? 0.35 : 1); });
+        ud.blobs.forEach((b) => {
+          b.material.color.copy(c).multiplyScalar(b.userData.tint || 1);
+          b.scale.setScalar(bare ? 0.35 : 1);
+        });
+        if (ud.cards) {
+          ud.cards.mesh.visible = !bare;
+          ud.cards.applySeason((it, col) => col.copy(c).multiplyScalar(0.82 + ((it.ry * 91) % 1) * 0.34), null);
+        }
       }
     }
 

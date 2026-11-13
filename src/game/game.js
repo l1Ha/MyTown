@@ -874,6 +874,7 @@
       this.vegetation.update(dt, this.camera);
       this.farm.update(dt);
       this.village.updateNight(env.nightFactor);
+      this.village.updateSmoke(dt, this.camera, this.renderer.domElement.height);
       // 逐帧动画（家禽、旗帜、渡船等）
       const anims = MT.animated;
       if (anims) {

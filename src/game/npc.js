@@ -8,7 +8,7 @@
   const THREE = window.THREE;
   const { rad, lerp, clamp, damp, TAU } = MT.util;
 
-  const SKIN = [0xe8b98e, 0xe0ab7c, 0xd8a074, 0xf0c69c];
+  const SKIN = [0xdfae7f, 0xd7a172, 0xcf9668, 0xe9bd92];
   const SHIRT_OLD = [0x3f4a5a, 0x4a4a48, 0x5a4a3a, 0x3a4a42, 0x6a5a4a];
   const SHIRT_MID = [0x8a4a3a, 0x3a5f8a, 0x4a6b4a, 0x9a7a4a, 0x7a5a7a];
   const SHIRT_KID = [0xd84a3a, 0x3a8ad8, 0xe0b040, 0x48b06a];
@@ -69,24 +69,26 @@
       torso.scale.set(shoulderW, 1, 0.62 * belly);
       torso.castShadow = true; torso.receiveShadow = true;
       this.body.add(torso);
-      // 肩
-      const shoulders = new THREE.Mesh(new THREE.CapsuleGeometry(0.075 * s, 0.24 * s, 4, 10), shirtMat);
-      shoulders.rotation.z = Math.PI / 2;
-      shoulders.position.y = 1.3 * s;
-      shoulders.scale.set(1, 1, 0.72);
-      shoulders.castShadow = true;
-      this.body.add(shoulders);
+      // 肩：一块横向的扁肩托，把躯干和两条手臂连成完整的肩线
+      const yoke = new THREE.Mesh(new THREE.CapsuleGeometry(0.042 * s, 0.23 * s, 4, 12), shirtMat);
+      yoke.rotation.z = Math.PI / 2;
+      yoke.position.y = 1.281 * s;
+      yoke.scale.set(0.5, 1.0, 0.72);
+      yoke.castShadow = true;
+      this.body.add(yoke);
       // 胯
       const hips = new THREE.Mesh(new THREE.CapsuleGeometry(0.14 * s, 0.06 * s, 4, 10), pantsMat);
       hips.rotation.z = Math.PI / 2;
       hips.position.y = 0.86 * s;
       hips.scale.set(1, 1, 0.7);
       this.body.add(hips);
-      // 衣领
-      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.086 * s, 0.022 * s, 6, 16), creamMat);
-      collar.rotation.x = Math.PI / 2;
-      collar.position.y = 1.365 * s;
+      // 衣领：立领（原来是一圈白色圆环，像戴着颈托）
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.072 * s, 0.078 * s, 0.055 * s, 14, 1, true), shirtMat);
+      collar.position.y = 1.364 * s;
       this.body.add(collar);
+      const collarTrim = new THREE.Mesh(new THREE.CylinderGeometry(0.0735 * s, 0.0735 * s, 0.012 * s, 14, 1, true), creamMat);
+      collarTrim.position.y = 1.392 * s;
+      this.body.add(collarTrim);
 
       // 脖子 + 头
       const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.055 * s, 0.075 * s, 0.12 * s, 10), skinMat);
@@ -107,67 +109,148 @@
         ear.scale.set(0.55, 1.05, 0.9);
         this.body.add(ear);
       }
-      // 鼻子（柔和的球，不做成棱）
-      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.02 * s, 10, 8), skinMat);
-      nose.position.set(0, 1.53 * s, 0.118 * s); nose.scale.set(0.85, 1.1, 1.0);
+      // 鼻子（小一些的柔和球 + 两个鼻孔）
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.016 * s, 10, 8), skinMat);
+      nose.position.set(0, 1.528 * s, 0.118 * s); nose.scale.set(0.85, 1.05, 0.9);
       this.body.add(nose);
-      // 眼白 + 瞳孔 + 眉毛
-      const scleraMat = new THREE.MeshStandardMaterial({ color: 0xf3efe6, roughness: 0.5 });
-      const pupilMat = new THREE.MeshStandardMaterial({ color: 0x1e1811, roughness: 0.4 });
-      const browMat = new THREE.MeshStandardMaterial({ color: 0x2a2320, roughness: 0.9 });
+      const nostrilMat = new THREE.MeshStandardMaterial({ color: 0x9c6b58, roughness: 0.9 });
       for (const sx of [-1, 1]) {
-        const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.018 * s, 10, 8), scleraMat);
-        sclera.position.set(sx * 0.043 * s, 1.566 * s, 0.113 * s); sclera.scale.set(1, 0.82, 0.55);
+        const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.0032 * s, 6, 5), nostrilMat);
+        nostril.position.set(sx * 0.0062 * s, 1.521 * s, 0.128 * s);
+        this.body.add(nostril);
+      }
+      // 眼白 + 虹膜 + 瞳孔 + 上眼睑 + 睫毛 + 眉毛
+      const scleraMat = new THREE.MeshStandardMaterial({ color: 0xf1ede3, roughness: 0.45 });
+      const irisMat = new THREE.MeshStandardMaterial({ color: 0x5b3d24, roughness: 0.4 });
+      const pupilMat = new THREE.MeshStandardMaterial({ color: 0x1a1410, roughness: 0.4 });
+      const browMat = new THREE.MeshStandardMaterial({ color: old ? 0x6f675f : 0x2a2320, roughness: 0.9 });
+      const lashMat = new THREE.MeshStandardMaterial({ color: 0x3a2c24, roughness: 0.9 });
+      for (const sx of [-1, 1]) {
+        const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.017 * s, 10, 8), scleraMat);
+        sclera.position.set(sx * 0.043 * s, 1.566 * s, 0.111 * s); sclera.scale.set(1, 0.85, 0.55);
         this.body.add(sclera);
-        const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.0075 * s, 8, 6), pupilMat);
-        pupil.position.set(sx * 0.043 * s, 1.566 * s, 0.121 * s);
+        const iris = new THREE.Mesh(new THREE.SphereGeometry(0.009 * s, 8, 6), irisMat);
+        iris.position.set(sx * 0.043 * s, 1.566 * s, 0.117 * s);
+        this.body.add(iris);
+        const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.0048 * s, 8, 6), pupilMat);
+        pupil.position.set(sx * 0.043 * s, 1.566 * s, 0.122 * s);
         this.body.add(pupil);
-        const brow = new THREE.Mesh(new THREE.BoxGeometry(0.045 * s, 0.01 * s, 0.012 * s), browMat);
-        brow.position.set(sx * 0.044 * s, 1.594 * s, 0.108 * s); brow.rotation.z = sx * rad(7);
+        // 上眼睑：压住眼白上缘，看起来像眼睛而不是贴了两颗白球
+        const lid = new THREE.Mesh(new THREE.SphereGeometry(0.0176 * s, 10, 6), skinMat);
+        lid.position.set(sx * 0.043 * s, 1.579 * s, 0.112 * s); lid.scale.set(1.02, 0.4, 0.6);
+        this.body.add(lid);
+        // 睫毛线：一条细黑线，眼睛立刻不"空"
+        const lash = new THREE.Mesh(new THREE.BoxGeometry(0.035 * s, 0.0042 * s, 0.008 * s), lashMat);
+        lash.position.set(sx * 0.043 * s, 1.5765 * s, 0.118 * s); lash.rotation.z = sx * rad(3);
+        this.body.add(lash);
+        const brow = new THREE.Mesh(new THREE.BoxGeometry(0.044 * s, 0.011 * s, 0.012 * s), browMat);
+        brow.position.set(sx * 0.044 * s, 1.596 * s, 0.109 * s); brow.rotation.z = -sx * rad(4);
         this.body.add(brow);
       }
-      // 嘴
-      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.042 * s, 0.011 * s, 0.012 * s),
-        new THREE.MeshStandardMaterial({ color: 0x8a4a40, roughness: 0.8 }));
-      mouth.position.set(0, 1.497 * s, 0.112 * s); this.body.add(mouth);
-      // 头发（多种发型）
-      const hairMat = new THREE.MeshStandardMaterial({ color: old ? 0x8f8b86 : 0x211d1a, roughness: 0.95 });
+      // 嘴：上唇线 + 下唇，别只是一道黑杠
+      const lipMat = new THREE.MeshStandardMaterial({ color: 0xb06a5c, roughness: 0.8 });
+      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.032 * s, 0.0075 * s, 0.01 * s),
+        new THREE.MeshStandardMaterial({ color: 0x7a4038, roughness: 0.85 }));
+      mouth.position.set(0, 1.497 * s, 0.113 * s); this.body.add(mouth);
+      const lowerLip = new THREE.Mesh(new THREE.BoxGeometry(0.029 * s, 0.006 * s, 0.009 * s), lipMat);
+      lowerLip.position.set(0, 1.4905 * s, 0.114 * s); this.body.add(lowerLip);
+      // 头发 / 头巾
+      const hairMat = new THREE.MeshStandardMaterial({ color: old ? 0x736e68 : 0x211d1a, roughness: 1.0 });
       const style2 = (this.role === 'child') ? 'bowl' : (old ? 'short' : (r.chance(0.45) ? 'bowl' : (r.chance(0.5) ? 'bun' : 'short')));
-      this.hairStyle = style2;
-      if (style2 !== 'bald') {
-        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.132 * s, 16, 12, 0, TAU, 0, Math.PI * 0.42), hairMat);
-        cap.position.y = 1.566 * s; cap.scale.set(1.0, 0.92, 1.05); cap.rotation.x = rad(4);
+      // 上了年纪的摊主戴蓝灰头巾，既符合乡村习惯，也避免灰色头发像扣了个头盔
+      const headscarf = old && (this.role === 'vendor' || r.chance(0.22));
+      this.hairStyle = headscarf ? 'scarf' : style2;
+      if (style2 !== 'bald' && !headscarf) {
+        // 发帽：垂直半径必须大于头骨（0.125*1.04），否则头顶会从头发里钻出来"秃顶"
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.14 * s, 16, 12, 0, TAU, 0, Math.PI * 0.38), hairMat);
+        cap.position.y = 1.556 * s; cap.scale.set(1.0, 0.94, 1.05); cap.rotation.x = rad(3);
         this.body.add(cap);
         // 后脑发量（不遮脸）
         const back = new THREE.Mesh(new THREE.SphereGeometry(0.125 * s, 14, 12), hairMat);
         back.position.set(0, 1.55 * s, -0.048 * s); back.scale.set(0.95, 0.95, 0.62);
         this.body.add(back);
+        // 鬓角：把"帽子"和脸连起来
+        for (const sx of [-1, 1]) {
+          const side = new THREE.Mesh(new THREE.BoxGeometry(0.028 * s, 0.13 * s, 0.05 * s), hairMat);
+          side.position.set(sx * 0.112 * s, 1.545 * s, 0.012 * s);
+          side.rotation.z = sx * rad(-4);
+          this.body.add(side);
+        }
+        // 刘海：几缕碎发，代替原来那条"帽檐"一样的横杠
         if (style2 === 'bowl') {
-          const fringe = new THREE.Mesh(new THREE.BoxGeometry(0.2 * s, 0.038 * s, 0.03 * s), hairMat);
-          fringe.position.set(0, 1.652 * s, 0.098 * s); fringe.rotation.x = rad(15);
-          this.body.add(fringe);
-        } else if (style2 === 'bun') {
+          for (let k = -1; k <= 1; k++) {
+            const tuft = new THREE.Mesh(new THREE.BoxGeometry(0.046 * s, 0.024 * s, 0.02 * s), hairMat);
+            tuft.position.set(k * 0.05 * s, 1.601 * s, 0.103 * s - Math.abs(k) * 0.004 * s);
+            tuft.rotation.z = k * rad(16); tuft.rotation.x = rad(10);
+            this.body.add(tuft);
+          }
+        } else {
+          for (const sx of [-1, 1]) {
+            const tuft = new THREE.Mesh(new THREE.BoxGeometry(0.05 * s, 0.022 * s, 0.02 * s), hairMat);
+            tuft.position.set(sx * 0.044 * s, 1.603 * s, 0.099 * s);
+            tuft.rotation.z = sx * rad(-18); tuft.rotation.x = rad(9);
+            this.body.add(tuft);
+          }
+        }
+        if (style2 === 'bun') {
           const bun = new THREE.Mesh(new THREE.SphereGeometry(0.055 * s, 12, 10), hairMat);
           bun.position.set(0, 1.585 * s, -0.135 * s);
           this.body.add(bun);
         }
+      }
+      if (headscarf) {
+        const scarfMat = MT.mat.scarf(r.pick([0x7d90a6, 0x8a7864, 0x74838a, 0x7c8b74]));
+        // 头顶：一块松松的布包住头发，边缘停在额头以上，不再盖住眉眼
+        const wrap = new THREE.Mesh(new THREE.SphereGeometry(0.14 * s, 18, 12, 0, TAU, 0, Math.PI * 0.31), scarfMat);
+        wrap.position.y = 1.548 * s; wrap.scale.set(1.05, 1.0, 1.08); wrap.rotation.x = rad(3);
+        this.body.add(wrap);
+        // 后脑的布量：贴着后脑勺，不盖住耳朵和脸
+        const backWrap = new THREE.Mesh(new THREE.SphereGeometry(0.124 * s, 16, 12), scarfMat);
+        backWrap.position.set(0, 1.548 * s, -0.058 * s);
+        backWrap.scale.set(0.8, 0.96, 0.58);
+        this.body.add(backWrap);
+        // 两侧不再加布条，让耳朵和脸侧露出来，避免像一顶帽子
+        // 额前的卷边：压在发际线上，露出一整张脸
+        const edge = new THREE.Mesh(new THREE.TorusGeometry(0.117 * s, 0.01 * s, 6, 24), scarfMat);
+        edge.rotation.x = Math.PI / 2;
+        edge.position.y = 1.628 * s;
+        edge.scale.set(1.03, 1.07, 1);
+        this.body.add(edge);
+        // 脑后的布结 + 一小片贴着头皮的布角（不要伸出"蜗牛角"）
+        const knot = new THREE.Mesh(new THREE.SphereGeometry(0.026 * s, 10, 8), scarfMat);
+        knot.position.set(0, 1.505 * s, -0.152 * s);
+        knot.scale.set(1.2, 0.9, 0.85);
+        this.body.add(knot);
+        const knotTie = new THREE.Mesh(new THREE.BoxGeometry(0.016 * s, 0.07 * s, 0.014 * s), scarfMat);
+        knotTie.position.set(0, 1.478 * s, -0.153 * s);
+        knotTie.rotation.x = rad(-6);
+        this.body.add(knotTie);
+        const tailGeo = new THREE.BufferGeometry();
+        tailGeo.setAttribute('position', new THREE.Float32BufferAttribute([
+          -0.05 * s, 0.05 * s, 0, 0.05 * s, 0.05 * s, 0, 0, -0.06 * s, 0,
+        ], 3));
+        tailGeo.computeVertexNormals();
+        const tail = new THREE.Mesh(tailGeo, scarfMat);
+        tail.position.set(0, 1.498 * s, -0.142 * s);
+        tail.rotation.x = rad(-5);
+        this.body.add(tail);
       }
 
       // 手臂（两段胶囊 + 圆手）
       this.arms = [];
       for (const sx of [-1, 1]) {
         const arm = new THREE.Group();
-        const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.046 * s, 0.18 * s, 4, 10), shirtMat);
-        upper.position.y = -0.12 * s; upper.castShadow = true;
+        const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.045 * s, 0.18 * s, 4, 10), shirtMat);
+        upper.position.y = -0.105 * s; upper.castShadow = true;
         arm.add(upper);
         const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.04 * s, 0.16 * s, 4, 10), shortSleeve ? skinMat : shirtMat);
-        forearm.position.y = -0.34 * s; forearm.castShadow = true;
+        forearm.position.y = -0.325 * s; forearm.castShadow = true;
         arm.add(forearm);
         const hand = new THREE.Mesh(new THREE.SphereGeometry(0.044 * s, 8, 6), skinMat);
-        hand.position.y = -0.475 * s; hand.scale.set(1, 1.15, 0.72);
+        hand.position.y = -0.46 * s; hand.scale.set(1, 1.15, 0.72);
         arm.add(hand);
-        arm.position.set(sx * 0.20 * s * shoulderW, 1.32 * s, 0);
-        arm.rotation.z = sx * rad(5);
+        arm.position.set(sx * 0.176 * s * shoulderW, 1.265 * s, 0);
+        arm.rotation.z = sx * rad(4);
         this.body.add(arm);
         this.arms.push(arm);
       }
@@ -191,24 +274,66 @@
         this.legs.push(leg);
       }
 
-      // 装扮：草帽 / 头巾 / 毛巾
+      // 装扮：草帽 / 头巾 / 毛巾 / 斜挎包
       const style = r.next();
-      if (old && style < 0.45) {
+      if (!headscarf && old && style < 0.45) {
         const hat = new THREE.Mesh(new THREE.ConeGeometry(0.26 * s, 0.14 * s, 14), MT.mat.straw());
         hat.position.y = 1.63 * s; hat.castShadow = true;
         this.body.add(hat);
-      } else if (!kid && style < 0.7) {
+      } else if (!headscarf && !kid && style < 0.7) {
         const towelMat = new THREE.MeshStandardMaterial({ color: r.chance(0.5) ? 0xd8d4c8 : 0x9ab0c8, roughness: 0.95 });
         // 搭在肩上的毛巾（卷起的一条，不再是大板）
         const roll = new THREE.Mesh(new THREE.CapsuleGeometry(0.035 * s, 0.22 * s, 4, 8), towelMat);
         roll.rotation.z = Math.PI / 2; roll.rotation.y = rad(10);
         roll.position.set(0.1 * s, 1.33 * s, 0.02 * s);
         this.body.add(roll);
-      } else if (r.chance(0.5)) {
-        const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.22 * s, 0.14 * s, 0.18 * s),
-          new THREE.MeshStandardMaterial({ color: r.pick([0xb8342a, 0x3a6b9a, 0xd8b23c]), roughness: 0.95 }));
-        cloth.position.y = 1.6 * s;
-        this.body.add(cloth);
+      } else if (!headscarf && this.role !== 'vendor' && r.chance(0.5)) {
+        // 斜挎的小包：背带贴着胸口，从右肩斜到左胯
+        const bagMat = new THREE.MeshStandardMaterial({ color: r.pick([0xb8342a, 0x3a6b9a, 0xd8b23c]), roughness: 0.95 });
+        const satchel = new THREE.Mesh(new THREE.BoxGeometry(0.15 * s, 0.16 * s, 0.075 * s), bagMat);
+        satchel.position.set(-0.145 * s, 1.12 * s, 0.105 * s);
+        satchel.rotation.y = rad(10);
+        this.body.add(satchel);
+        const flap = new THREE.Mesh(new THREE.BoxGeometry(0.155 * s, 0.06 * s, 0.08 * s), bagMat);
+        flap.position.set(-0.145 * s, 1.19 * s, 0.107 * s);
+        flap.rotation.y = rad(10);
+        this.body.add(flap);
+        // 肩带：一条贴着胸口的窄带，两端分别落在肩头和包口
+        const strap = new THREE.Mesh(new THREE.BoxGeometry(0.028 * s, 0.3 * s, 0.012 * s), bagMat);
+        strap.position.set(-0.035 * s, 1.265 * s, 0.112 * s);
+        strap.rotation.z = rad(-50); strap.rotation.x = rad(-4);
+        this.body.add(strap);
+        const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.034 * s, 0.03 * s, 0.016 * s), MT.mat.metal(0xa8aeb4, 0.4));
+        buckle.position.set(-0.1 * s, 1.185 * s, 0.12 * s); buckle.rotation.z = rad(-50);
+        this.body.add(buckle);
+      }
+      // 摊主的围裙：深蓝粗布，贴着身子的一圈弧面（不再是一块悬空的平板）
+      if (this.role === 'vendor') {
+        const apronMat = new THREE.MeshStandardMaterial({ color: 0x46525e, roughness: 1.0, side: THREE.DoubleSide });
+        const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.175 * s, 0.205 * s, 0.42 * s, 16, 1, true, -0.98, 1.96), apronMat);
+        skirt.position.set(0, 1.01 * s, 0.008 * s);
+        skirt.scale.z = 0.8;
+        skirt.castShadow = true;
+        this.body.add(skirt);
+        // 胸兜，顺着胸口微微后仰
+        const bib = new THREE.Mesh(new THREE.BoxGeometry(0.155 * s, 0.155 * s, 0.016 * s), apronMat);
+        bib.position.set(0, 1.245 * s, 0.118 * s); bib.rotation.x = rad(-18);
+        this.body.add(bib);
+        const pocket = new THREE.Mesh(new THREE.BoxGeometry(0.115 * s, 0.08 * s, 0.013 * s), apronMat);
+        pocket.position.set(0, 1.07 * s, 0.152 * s); pocket.rotation.x = rad(-4);
+        this.body.add(pocket);
+        // 腰带
+        const waist = new THREE.Mesh(new THREE.CylinderGeometry(0.178 * s, 0.178 * s, 0.035 * s, 16, 1, true, -1.15, 2.3), apronMat);
+        waist.position.set(0, 1.222 * s, 0.006 * s);
+        waist.scale.z = 0.8;
+        this.body.add(waist);
+        // 颈带：从胸兜上角绕到脖子后面
+        for (const sx of [-1, 1]) {
+          const tie = new THREE.Mesh(new THREE.BoxGeometry(0.018 * s, 0.11 * s, 0.012 * s), apronMat);
+          tie.position.set(sx * 0.052 * s, 1.365 * s, 0.077 * s);
+          tie.rotation.x = rad(-20); tie.rotation.z = sx * rad(8);
+          this.body.add(tie);
+        }
       }
       // 农具（锄头 / 篮子）
       if (this.role === 'farmer' || this.role === 'miller') {

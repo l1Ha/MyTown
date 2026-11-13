@@ -258,45 +258,121 @@
     const m = M(), g = P.g();
     const isE = electrified !== false;
     const boxMat = isE ? m.blue : m.wood;
-    // 车厢 + 竖筋
-    const box = B().box(1.25, 0.62, 1.6, boxMat, 0.9); box.position.set(0, 0.86, -0.55); g.add(box);
-    for (let i = 0; i < 4; i++) { const rib = B().box(1.28, 0.56, 0.03, boxMat, 0.4); rib.position.set(0, 0.86, -1.35 + i * 0.5); g.add(rib); }
-    const rail = B().box(1.3, 0.06, 1.64, m.metalDark, 0.5); rail.position.set(0, 1.18, -0.55); g.add(rail);
-    const bigWheel = () => {
-      const w = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 6, 16), m.metalDark);
-      w.rotation.y = Math.PI / 2; w.castShadow = true;
-      const d = B().cyl(0.27, 0.27, 0.05, m.metalDark, 14);
-      d.rotation.z = Math.PI / 2; w.add(d); return w;
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x1d1d20, roughness: 0.95 });
+    const hubMat = MT.mat.metal(0x9aa0a6, 0.45);
+
+    // 车轮：轮胎 + 轮毂 + 辐条（原来只有两圈细铁环）
+    const wheel = (r, w) => {
+      const wg = new THREE.Group();
+      const tire = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 18), tireMat);
+      tire.rotation.z = Math.PI / 2; tire.castShadow = true; wg.add(tire);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.38, r * 0.38, w * 1.02, 12), hubMat);
+      hub.rotation.z = Math.PI / 2; wg.add(hub);
+      for (let i = 0; i < 4; i++) {
+        const sp = new THREE.Mesh(new THREE.BoxGeometry(w * 1.04, r * 0.62, 0.03), hubMat);
+        sp.rotation.x = i * Math.PI / 4; wg.add(sp);
+      }
+      return wg;
     };
-    const w1 = bigWheel(); w1.position.set(-0.62, 0.3, -0.6); g.add(w1);
-    const w2 = bigWheel(); w2.position.set(0.62, 0.3, -0.6); g.add(w2);
-    // 后轮挡泥板
+    const w1 = wheel(0.32, 0.12); w1.position.set(-0.65, 0.32, -0.55); g.add(w1);
+    const w2 = wheel(0.32, 0.12); w2.position.set(0.65, 0.32, -0.55); g.add(w2);
+    const wf = wheel(0.29, 0.09); wf.position.set(0, 0.29, 0.98); g.add(wf);
+    // 后挡泥板
     for (const sx of [-1, 1]) {
-      const fender = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.05, 6, 14, Math.PI), boxMat);
-      fender.rotation.y = Math.PI / 2; fender.position.set(sx * 0.62, 0.3, -0.6); g.add(fender);
+      const fender = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.055, 6, 16, Math.PI), boxMat);
+      fender.rotation.y = Math.PI / 2; fender.position.set(sx * 0.65, 0.33, -0.55); g.add(fender);
     }
-    const front = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.045, 6, 16), m.metalDark);
-    front.rotation.y = Math.PI / 2; front.position.set(0, 0.28, 0.95); g.add(front);
-    const fork = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.035, 6, 14, Math.PI), m.metalDark);
-    fork.rotation.y = Math.PI / 2; fork.position.set(0, 0.28, 0.95); g.add(fork);
-    const frame = B().box(0.09, 0.09, 1.6, m.metalDark, 0.6); frame.position.set(0, 0.6, 0.3); g.add(frame);
+    // 前叉 / 前挡泥板
+    const frontFender = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.045, 6, 14, Math.PI), boxMat);
+    frontFender.rotation.y = Math.PI / 2; frontFender.position.set(0, 0.3, 0.98); g.add(frontFender);
+    for (const sx of [-1, 1]) {
+      const fork = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.55, 6), m.metalDark);
+      fork.position.set(sx * 0.09, 0.58, 0.95); fork.rotation.x = rad(-12); g.add(fork);
+    }
+
+    // 车架 / 踏板
+    const frame = B().box(0.12, 0.1, 1.65, m.metalDark, 0.6); frame.position.set(0, 0.6, 0.22); g.add(frame);
+    const floor = B().box(0.86, 0.06, 0.62, m.metalDark, 0.6); floor.position.set(0, 0.52, 0.34); g.add(floor);
+
+    // 车斗：底板 + 四面挡板 + 竖筋 + 尾门
+    const bedY = 0.88, bedZ = -0.62;
+    const bedFloor = B().box(1.3, 0.08, 1.65, boxMat, 0.8); bedFloor.position.set(0, bedY - 0.31, bedZ); g.add(bedFloor);
+    for (const sx of [-1, 1]) {
+      const side = B().box(0.06, 0.62, 1.65, boxMat, 0.7); side.position.set(sx * 0.65, bedY, bedZ); g.add(side);
+      // 侧板竖筋
+      for (let i = 0; i < 4; i++) {
+        const rib = B().box(0.075, 0.56, 0.035, m.metalDark, 0.3);
+        rib.position.set(sx * 0.665, bedY, bedZ - 0.62 + i * 0.42); g.add(rib);
+      }
+      // 反光条
+      const refl = B().box(0.02, 0.06, 0.5, m.yellow, 0.2);
+      refl.position.set(sx * 0.687, bedY + 0.16, bedZ + 0.45); g.add(refl);
+    }
+    const tail = B().box(1.3, 0.6, 0.06, boxMat, 0.7); tail.position.set(0, bedY, -1.44); g.add(tail);
+    // 尾门横筋 + 合页
+    const tailRib = B().box(1.24, 0.05, 0.03, m.metalDark, 0.3);
+    tailRib.position.set(0, bedY + 0.18, -1.475); g.add(tailRib);
+    for (const sx of [-1, 1]) {
+      const hinge = B().box(0.1, 0.06, 0.035, m.metalDark, 0.2);
+      hinge.position.set(sx * 0.45, bedY + 0.26, -1.478); g.add(hinge);
+    }
+    // 尾灯
+    for (const sx of [-1, 1]) {
+      const lamp = B().box(0.14, 0.1, 0.04, new THREE.MeshStandardMaterial({ color: 0x9a2018, emissive: 0x3a0805, roughness: 0.5 }), 0.3);
+      lamp.position.set(sx * 0.55, bedY - 0.26, -1.48); g.add(lamp);
+    }
+    const rail = B().box(1.36, 0.05, 1.7, m.metalDark, 0.5); rail.position.set(0, 1.22, bedZ); g.add(rail);
+    // 车斗里的货
+    for (let i = 0; i < 3; i++) {
+      const sack = B().box(0.38, 0.28, 0.5, m.straw, 0.8);
+      sack.position.set(-0.28 + i * 0.3, 1.04, bedZ - 0.2 + i * 0.16);
+      sack.rotation.y = (i - 1) * 0.2; g.add(sack);
+    }
+    const crate = B().box(0.5, 0.26, 0.4, m.wood, 0.6);
+    crate.position.set(0.25, 1.02, bedZ + 0.45); g.add(crate);
+
     if (isE) {
+      // 驾驶室：壳体 + 立柱 + 玻璃 + 车顶
       const cab = B().box(1.15, 1.0, 0.9, boxMat, 1.0); cab.position.set(0, 1.5, 0.45); g.add(cab);
-      const cabRidge = B().cyl(0.14, 0.14, 0.9, boxMat, 10); cabRidge.rotation.x = Math.PI / 2; cabRidge.position.set(0, 2.05, 0.45); g.add(cabRidge);
-      const windshield = B().plane(1.02, 0.8, m.glassDark, 1, 1); windshield.position.set(0, 1.5, 0.92); g.add(windshield);
-      for (const sx of [-1, 1]) { const win = B().plane(0.6, 0.7, m.glassDark, 1, 1); win.rotation.y = Math.PI / 2; win.position.set(sx * 0.59, 1.55, 0.45); g.add(win); }
-      const cabTop = B().box(1.25, 0.08, 1.0, boxMat, 0.8); cabTop.position.set(0, 1.98, 0.45); g.add(cabTop);
-      const motor = B().cyl(0.16, 0.16, 0.28, m.metalDark, 10); motor.rotation.z = Math.PI / 2; motor.position.set(0, 0.3, -0.6); g.add(motor);
+      const windshield = B().plane(1.02, 0.72, m.glassDark, 1, 1); windshield.position.set(0, 1.62, 0.905); g.add(windshield);
+      for (const sx of [-1, 1]) {
+        const win = B().plane(0.62, 0.58, m.glassDark, 1, 1);
+        win.rotation.y = Math.PI / 2; win.position.set(sx * 0.579, 1.62, 0.45); g.add(win);
+        // 车门缝 + 把手
+        const seam = B().box(0.012, 0.86, 0.02, m.metalDark, 0.2);
+        seam.position.set(sx * 0.581, 1.44, 0.04); g.add(seam);
+        const handle = B().box(0.02, 0.03, 0.12, m.metalDark, 0.2);
+        handle.position.set(sx * 0.588, 1.33, 0.22); g.add(handle);
+      }
+      // 后窗
+      const rearWin = B().plane(0.9, 0.46, m.glassDark, 1, 1);
+      rearWin.rotation.y = Math.PI; rearWin.position.set(0, 1.7, 0.0); g.add(rearWin);
+      // A/B 柱与车顶
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+        const pillar = B().box(0.055, 0.92, 0.055, boxMat, 0.3);
+        pillar.position.set(sx * 0.545, 1.5, 0.45 + sz * 0.42); g.add(pillar);
+      }
+      const cabTop = B().box(1.3, 0.09, 1.06, boxMat, 0.8); cabTop.position.set(0, 2.03, 0.45); g.add(cabTop);
+      const cabTrim = B().cyl(0.1, 0.1, 1.06, boxMat, 8); cabTrim.rotation.x = Math.PI / 2; cabTrim.position.set(0, 2.09, 0.45); g.add(cabTrim);
       // 后视镜
       for (const sx of [-1, 1]) {
-        const stem = B().cyl(0.015, 0.015, 0.28, m.metalDark, 6); stem.position.set(sx * 0.6, 1.75, 0.86); g.add(stem);
-        const mir = B().box(0.14, 0.1, 0.03, m.glassDark, 0.3); mir.position.set(sx * 0.66, 1.9, 0.9); g.add(mir);
+        const stem = B().cyl(0.015, 0.015, 0.28, m.metalDark, 6); stem.position.set(sx * 0.6, 1.83, 0.86); g.add(stem);
+        const mir = B().box(0.14, 0.1, 0.03, m.glassDark, 0.3); mir.position.set(sx * 0.66, 1.97, 0.9); g.add(mir);
       }
-      // 方向把
-      const bar = B().box(0.7, 0.05, 0.05, m.metalDark, 0.4); bar.position.set(0, 1.16, 0.72); g.add(bar);
-      const head = B().cyl(0.09, 0.09, 0.05, m.yellow, 10); head.rotation.x = Math.PI / 2; head.position.set(0, 1.0, 0.98); g.add(head);
+      // 方向把、仪表、大灯、前保险杠
+      const bar = B().box(0.7, 0.05, 0.05, m.metalDark, 0.4); bar.position.set(0, 1.22, 0.72); g.add(bar);
+      const dash = B().box(0.5, 0.16, 0.18, m.metalDark, 0.4); dash.position.set(0, 1.2, 0.72); g.add(dash);
+      const head = B().cyl(0.1, 0.1, 0.06, m.yellow, 12); head.rotation.x = Math.PI / 2; head.position.set(0, 1.03, 0.99); g.add(head);
+      const headRim = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.015, 5, 12), m.metalDark);
+      headRim.rotation.x = Math.PI / 2; headRim.position.set(0, 1.03, 0.995); g.add(headRim);
+      const bumper = B().box(0.9, 0.08, 0.1, m.metalDark, 0.4); bumper.position.set(0, 0.56, 1.02); g.add(bumper);
+      const plate = B().box(0.28, 0.09, 0.02, MT.mat.solid(0x2f6b4a, { roughness: 0.6 }), 0.2);
+      plate.position.set(0, 0.69, 1.07); g.add(plate);
+      // 座椅（透过玻璃能看到）
+      const seat = B().box(0.56, 0.1, 0.42, m.metalDark, 0.4); seat.position.set(0, 1.12, 0.3); g.add(seat);
+      const back = B().box(0.56, 0.4, 0.07, m.metalDark, 0.4); back.position.set(0, 1.3, 0.11); g.add(back);
+      const motor = B().cyl(0.16, 0.16, 0.28, m.metalDark, 10); motor.rotation.z = Math.PI / 2; motor.position.set(0, 0.3, -0.55); g.add(motor);
     } else {
-      const n = 2;
       const seat = B().box(0.36, 0.09, 0.3, m.metalDark, 0.4); seat.position.set(0, 0.96, 0.5); g.add(seat);
       const back = B().box(0.36, 0.26, 0.05, m.metalDark, 0.4); back.position.set(0, 1.1, 0.36); g.add(back);
       const bar = B().box(0.56, 0.05, 0.05, m.metalDark, 0.4); bar.position.set(0, 1.1, 0.9); g.add(bar);
@@ -615,47 +691,70 @@
     const m = M(), g = P.g();
     const r = rng || new MT.RNG(1);
     const white = r.chance(0.6);
-    const bodyMat = new THREE.MeshStandardMaterial({ color: white ? 0xf2ece0 : 0xc8873c, roughness: 0.9 });
+    const bodyMat = new THREE.MeshStandardMaterial({ color: white ? 0xece6d8 : 0xc08644, roughness: 0.92 });
+    const wingMat = new THREE.MeshStandardMaterial({ color: white ? 0xdad2c0 : 0xa9652c, roughness: 0.95 });
     const combMat = new THREE.MeshStandardMaterial({ color: 0xc8342a, roughness: 0.7 });
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 11), bodyMat);
-    body.scale.set(1.3, 1.0, 1.0); body.position.y = 0.27; body.castShadow = true; g.add(body);
-    // 翅膀
+    // 身体：略向前倾的蛋形
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 11), bodyMat);
+    body.scale.set(1.3, 0.95, 0.9); body.position.set(0, 0.27, 0); body.rotation.z = rad(-8);
+    body.castShadow = true; g.add(body);
+    const breast = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 9), bodyMat);
+    breast.scale.set(0.95, 0.9, 0.85); breast.position.set(0.09, 0.3, 0); g.add(breast);
+    // 翅膀：深一号的颜色 + 三层羽毛，避免整个身体是一团白
     for (const sz of [-1, 1]) {
-      const wing = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), bodyMat);
-      wing.scale.set(1.2, 0.72, 0.34); wing.position.set(-0.02, 0.3, sz * 0.13);
-      wing.rotation.y = sz * rad(8); g.add(wing);
+      const wing = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), wingMat);
+      wing.scale.set(1.3, 0.62, 0.3); wing.position.set(-0.015, 0.29, sz * 0.125);
+      wing.rotation.y = sz * rad(9); wing.rotation.z = rad(-6); g.add(wing);
+      for (let a = 0; a < 3; a++) {
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.11, 5), wingMat);
+        tip.rotation.z = rad(105); tip.position.set(-0.11 - a * 0.018, 0.27 - a * 0.008, sz * 0.14);
+        g.add(tip);
+      }
     }
-    const neck = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.1, 3, 9), bodyMat);
-    neck.position.set(0.19, 0.4, 0); neck.rotation.z = rad(-30); g.add(neck);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.072, 12, 9), bodyMat);
-    head.position.set(0.26, 0.48, 0); g.add(head);
-    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.026, 0.09, 6), m.yellow);
-    beak.rotation.z = rad(-90); beak.position.set(0.33, 0.47, 0); g.add(beak);
-    const comb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), combMat);
-    comb.scale.set(1.7, 0.9, 0.5); comb.position.set(0.26, 0.55, 0); g.add(comb);
-    const wattle = new THREE.Mesh(new THREE.SphereGeometry(0.016, 6, 5), combMat);
-    wattle.position.set(0.3, 0.44, 0); g.add(wattle);
-    for (const sz of [-1, 1]) {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 5), EYE_MAT);
-      eye.position.set(0.3, 0.5, sz * 0.035); g.add(eye);
+    // 脖子 / 头
+    const neck = new THREE.Mesh(new THREE.CapsuleGeometry(0.043, 0.12, 3, 9), bodyMat);
+    neck.position.set(0.16, 0.41, 0); neck.rotation.z = rad(-32); g.add(neck);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.066, 12, 9), bodyMat);
+    head.position.set(0.255, 0.49, 0); g.add(head);
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.075, 6), m.yellow);
+    beak.rotation.z = rad(-90); beak.position.set(0.325, 0.478, 0); g.add(beak);
+    // 鸡冠：三个小瓣
+    for (let a = 0; a < 3; a++) {
+      const comb = new THREE.Mesh(new THREE.SphereGeometry(0.024 - a * 0.003, 6, 5), combMat);
+      comb.scale.set(1.3, 1.25, 0.45);
+      comb.position.set(0.225 + a * 0.028, 0.552 + Math.sin(a) * 0.006, 0);
+      g.add(comb);
     }
-    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.24, 7), bodyMat);
-    tail.rotation.z = rad(64); tail.position.set(-0.2, 0.38, 0); tail.scale.set(1, 1, 0.5); g.add(tail);
+    const wattle = new THREE.Mesh(new THREE.SphereGeometry(0.014, 6, 5), combMat);
+    wattle.scale.set(1, 1.35, 0.7); wattle.position.set(0.3, 0.443, 0); g.add(wattle);
     for (const sz of [-1, 1]) {
-      const feather = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 5), bodyMat);
-      feather.rotation.z = rad(74); feather.rotation.y = sz * rad(18);
-      feather.position.set(-0.2, 0.36, sz * 0.045); g.add(feather);
-      const leg = legCap(0.013, 0.13, m.yellow);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.011, 6, 5), EYE_MAT);
+      eye.position.set(0.295, 0.505, sz * 0.034); g.add(eye);
+    }
+    // 尾巴：几根长尾羽
+    for (let a = 0; a < 4; a++) {
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.04 - a * 0.005, 0.24 + a * 0.02, 6), wingMat);
+      tail.rotation.z = rad(68 + a * 3); tail.rotation.x = rad((a - 1.5) * 9);
+      tail.position.set(-0.2 - a * 0.01, 0.34 + a * 0.012, (a - 1.5) * 0.028);
+      g.add(tail);
+    }
+    for (const sz of [-1, 1]) {
+      const leg = legCap(0.012, 0.13, m.yellow);
       leg.position.set(0.02, 0.1, sz * 0.05); g.add(leg);
-      const foot = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), m.yellow);
-      foot.scale.set(1.5, 0.35, 1.0); foot.position.set(0.05, 0.012, sz * 0.05); g.add(foot);
+      // 三根脚趾
+      for (let a = -1; a <= 1; a++) {
+        const toe = new THREE.Mesh(new THREE.CapsuleGeometry(0.007, 0.055, 2, 5), m.yellow);
+        toe.rotation.x = Math.PI / 2; toe.rotation.z = a * 0.32;
+        toe.position.set(0.05 + a * 0.008, 0.012, sz * 0.05 + a * 0.024);
+        g.add(toe);
+      }
     }
     const head0 = head.position.clone();
     anim(g, (t, dt, self) => {
       const peck = Math.sin(t * 1.4 + self.position.x * 2.1);
       const k = Math.max(0, peck) * 0.5;
-      head.position.set(0.26 + k * 0.06, 0.48 - k * 0.22, head0.z);
-      neck.position.y = 0.4 - k * 0.11;
+      head.position.set(0.255 + k * 0.06, 0.49 - k * 0.22, head0.z);
+      neck.position.y = 0.41 - k * 0.11;
       self.rotation.z = Math.sin(t * 2.2 + self.position.z) * 0.03;
     });
     return prop(g);

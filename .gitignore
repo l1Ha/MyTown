@@ -7,3 +7,6 @@ desktop.ini
 # 依赖与构建产物（本项目无需构建，留作备用）
 node_modules/
 dist/
+
+# 自检截图（本地生成，不入库）
+shots/

@@ -439,6 +439,70 @@
       grain(ctx, s, 22);
     }),
 
+    /* ---- 集市土场：压实的黄土，带碎草、脚印和车辙 ---- */
+    marketGround: () => tex('marketGround', qsize(1024), (ctx, s) => {
+      ctx.fillStyle = '#ab9772'; ctx.fillRect(0, 0, s, s);
+      // 画到边界上的东西要跟着"绕一圈"再画一次，平铺时才不会有接缝
+      const wrap9 = (x, y, m, fn) => {
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            const xx = x + dx * s, yy = y + dy * s;
+            if (xx < -m || xx > s + m || yy < -m || yy > s + m) continue;
+            fn(xx, yy);
+          }
+        }
+      };
+      // 大块的深浅
+      for (let i = 0; i < 90; i++) {
+        const x = Math.random() * s, y = Math.random() * s, r = 40 + Math.random() * 85;
+        const col = Math.random() < 0.5 ? '140,120,88' : '198,180,144';
+        wrap9(x, y, r, (xx, yy) => {
+          const g2 = ctx.createRadialGradient(xx, yy, 0, xx, yy, r);
+          g2.addColorStop(0, `rgba(${col},0.30)`);
+          g2.addColorStop(1, `rgba(${col},0)`);
+          ctx.fillStyle = g2;
+          ctx.beginPath(); ctx.arc(xx, yy, r, 0, 7); ctx.fill();
+        });
+      }
+      // 细土粒
+      for (let i = 0; i < 2400; i++) {
+        const x = Math.random() * s, y = Math.random() * s, r = 0.5 + Math.random() * 2.2;
+        const k = 0.72 + Math.random() * 0.5;
+        wrap9(x, y, 3, (xx, yy) => {
+          ctx.fillStyle = `rgba(${(150 * k) | 0},${(132 * k) | 0},${(100 * k) | 0},0.45)`;
+          ctx.beginPath(); ctx.arc(xx, yy, r, 0, 7); ctx.fill();
+        });
+      }
+      // 踩出来的浅坑和脚印
+      for (let i = 0; i < 34; i++) {
+        const x = Math.random() * s, y = Math.random() * s;
+        const a = Math.random() * Math.PI, rr = 3 + Math.random() * 5;
+        wrap9(x, y, 12, (xx, yy) => {
+          ctx.fillStyle = 'rgba(118,100,72,0.16)';
+          ctx.beginPath();
+          ctx.ellipse(xx, yy, rr * 1.8, rr, a, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+      // 散落的麦秸 / 草屑
+      for (let i = 0; i < 120; i++) {
+        const x = Math.random() * s, y = Math.random() * s, a = Math.random() * Math.PI;
+        const len = 3 + Math.random() * 12;
+        const stroke = `rgba(${170 + Math.random() * 40 | 0},${150 + Math.random() * 30 | 0},${88 + Math.random() * 30 | 0},0.45)`;
+        const lw = 0.8 + Math.random() * 1.2;
+        wrap9(x, y, 16, (xx, yy) => {
+          ctx.strokeStyle = stroke; ctx.lineWidth = lw;
+          ctx.beginPath(); ctx.moveTo(xx, yy); ctx.lineTo(xx + Math.cos(a) * len, yy + Math.sin(a) * len); ctx.stroke();
+        });
+      }
+      // 两道很浅的车辙（现在贴图会绕边平铺，不会再出现接缝亮线）
+      for (const rx of [0.3, 0.7]) {
+        ctx.fillStyle = 'rgba(126,108,78,0.07)';
+        ctx.fillRect(s * rx - s * 0.016, 0, s * 0.032, s);
+      }
+      grain(ctx, s, 26);
+    }),
+
     /* ---- 田地土壤 ---- */
     soil: () => tex('soil', qsize(1024), (ctx, s) => {
       ctx.fillStyle = '#6d5a41'; ctx.fillRect(0, 0, s, s);
@@ -618,6 +682,58 @@
       grain(ctx, s, 12);
     }),
 
+    /* ---- 蓝印花布（头巾），白底小点花样，材质里染色 ---- */
+    scarf: () => tex('scarf', qsize(256), (ctx, s) => {
+      ctx.fillStyle = '#f2eee2'; ctx.fillRect(0, 0, s, s);
+      mottle(ctx, s, { alpha: 0.05, seed: 43 });
+      const cell = s / 8;
+      for (let gy = 0; gy < 8; gy++) {
+        for (let gx = 0; gx < 8; gx++) {
+          const cx = (gx + 0.5) * cell + ((gy % 2) ? cell * 0.5 : 0);
+          const cy = (gy + 0.5) * cell;
+          ctx.fillStyle = 'rgba(64,74,88,0.34)';
+          for (let k = 0; k < 4; k++) {
+            const a = k * Math.PI / 2;
+            ctx.beginPath();
+            ctx.arc(cx + Math.cos(a) * cell * 0.12, cy + Math.sin(a) * cell * 0.12, cell * 0.075, 0, 7);
+            ctx.fill();
+          }
+          ctx.beginPath(); ctx.arc(cx, cy, cell * 0.055, 0, 7); ctx.fill();
+        }
+      }
+      grain(ctx, s, 18);
+    }),
+
+    /* ---- 集市帆布 / 粗布（浅色底，材质里再染成褪色的红/绿/蓝）---- */
+    cloth: () => tex('cloth', qsize(512), (ctx, s) => {
+      ctx.fillStyle = '#e2ddd0'; ctx.fillRect(0, 0, s, s);
+      // 织纹：横竖细线
+      for (let y = 0; y < s; y += 4) {
+        ctx.strokeStyle = `rgba(120,110,94,${0.04 + Math.random() * 0.05})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(s, y); ctx.stroke();
+      }
+      for (let x = 0; x < s; x += 4) {
+        ctx.strokeStyle = `rgba(255,252,240,${0.04 + Math.random() * 0.04})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, s); ctx.stroke();
+      }
+      // 宽条纹
+      for (let i = 0; i < 6; i++) {
+        ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.10)' : 'rgba(86,76,62,0.09)';
+        ctx.fillRect(i * s / 6, 0, s / 12, s);
+      }
+      // 晒旧的污渍与折痕
+      splotch(ctx, s, 26, 5, 34, () => ['rgba(96,84,66,0.10)', 'rgba(96,84,66,0)']);
+      for (let i = 0; i < 6; i++) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 2 + Math.random() * 3;
+        ctx.beginPath();
+        const y = Math.random() * s;
+        ctx.moveTo(0, y); ctx.lineTo(s, y + (Math.random() - 0.5) * 40); ctx.stroke();
+      }
+      grain(ctx, s, 20);
+    }),
+
     /* ---- 菜地土垄 ---- */
     vegetableBed: () => tex('vegetableBed', qsize(512), (ctx, s) => {
       ctx.fillStyle = '#5b4a34'; ctx.fillRect(0, 0, s, s);
@@ -771,33 +887,35 @@
         ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (Math.random() - 0.5) * 12, y - 14); ctx.stroke();
       }
     }),
-    cropRice: () => tex('cropRice', qsize(256), (ctx, s) => {
+    cropRice: () => tex('cropRice', qsize(512), (ctx, s) => {
       baseFill(ctx, s, [118, 158, 68], 0.3);
-      for (let i = 0; i < 16; i++) {
-        const x0 = s * (0.05 + Math.random() * 0.9);
-        const h = s * (0.6 + Math.random() * 0.4);
-        const lean = (Math.random() - 0.5) * s * 0.28;
+      for (let i = 0; i < 26; i++) {
+        const x0 = s * (0.04 + Math.random() * 0.92);
+        const h = s * (0.58 + Math.random() * 0.42);
+        const lean = (Math.random() - 0.5) * s * 0.3;
         const k = 0.68 + Math.random() * 0.5;
-        ctx.strokeStyle = `rgba(${(118 * k) | 0},${(162 * k) | 0},${(64 * k) | 0},0.95)`;
-        ctx.lineWidth = 2.4;
+        ctx.strokeStyle = `rgba(${(112 * k) | 0},${(166 * k) | 0},${(62 * k) | 0},0.96)`;
+        ctx.lineWidth = 4.2;
         ctx.beginPath(); ctx.moveTo(x0, s);
         ctx.quadraticCurveTo(x0 + lean * 0.4, s - h * 0.55, x0 + lean, s - h);
         ctx.stroke();
-        // 稻叶
-        ctx.strokeStyle = `rgba(${(96 * k) | 0},${(140 * k) | 0},${(58 * k) | 0},0.9)`; ctx.lineWidth = 1.6;
-        const yy = s - h * 0.5, dir = Math.random() < 0.5 ? 1 : -1;
-        ctx.beginPath(); ctx.moveTo(x0 + lean * 0.3, yy);
-        ctx.quadraticCurveTo(x0 + dir * 14, yy - 8, x0 + dir * 20, yy + 2); ctx.stroke();
+        // 稻叶：每株多几片，别像一根根细针
+        for (let a = 0; a < 3; a++) {
+          const yy = s - h * (0.38 + a * 0.18), dir = (a % 2 ? 1 : -1) * (0.7 + Math.random() * 0.6);
+          ctx.strokeStyle = `rgba(${(92 * k) | 0},${(142 * k) | 0},${(54 * k) | 0},0.92)`; ctx.lineWidth = 2.6;
+          ctx.beginPath(); ctx.moveTo(x0 + lean * 0.3, yy);
+          ctx.quadraticCurveTo(x0 + dir * 18, yy - 10, x0 + dir * 30, yy + 4); ctx.stroke();
+        }
         // 稻穗（下垂）
         ctx.strokeStyle = `rgba(${(192 * k) | 0},${(198 * k) | 0},${(112 * k) | 0},0.92)`;
-        ctx.lineWidth = 3.2;
+        ctx.lineWidth = 4.2;
         ctx.beginPath();
         ctx.moveTo(x0 + lean, s - h);
-        ctx.quadraticCurveTo(x0 + lean + 9, s - h + 7, x0 + lean + 4, s - h + 16);
+        ctx.quadraticCurveTo(x0 + lean + 12, s - h + 9, x0 + lean + 6, s - h + 22);
         ctx.stroke();
         // 谷粒
-        ctx.fillStyle = `rgba(${(206 * k) | 0},${(200 * k) | 0},${(126 * k) | 0},0.85)`;
-        for (let a = 0; a < 4; a++) { ctx.beginPath(); ctx.arc(x0 + lean + 3 + a * 1.2, s - h + 4 + a * 3.4, 1.6, 0, 7); ctx.fill(); }
+        ctx.fillStyle = `rgba(${(206 * k) | 0},${(200 * k) | 0},${(126 * k) | 0},0.9)`;
+        for (let a = 0; a < 6; a++) { ctx.beginPath(); ctx.arc(x0 + lean + 4 + a * 1.6, s - h + 5 + a * 3.6, 2.2, 0, 7); ctx.fill(); }
       }
     }),
     cropCorn: () => tex('cropCorn', qsize(256), (ctx, s) => {
@@ -1004,6 +1122,11 @@
     },
     /* 带凹凸（法线）的贴图材质：颜色 + 由明度推导的法线图 */
     bump(mapKey, rx, ry, rough, nscale) {
+      // 有些材质（wood 等）会在贴图预生成之前被创建，此时 cache 里还没有图；
+      // 直接按需生成，否则 map 为 null，木器会变成一块白塑料。
+      if (!cache[mapKey] && T[mapKey]) {
+        try { T[mapKey](); } catch (e) { console.warn('[textures] 按需生成失败', mapKey, e); }
+      }
       const m = M.std(cloneTex(mapKey, rx, ry), { roughness: rough });
       const n = nrm(mapKey, rx, ry);
       if (n) { m.normalMap = n; const s = nscale || 0.5; m.normalScale = new THREE.Vector2(s, s); }
@@ -1024,6 +1147,10 @@
     concrete(rx = 1, ry = 1) { return M.bump('concrete', rx, ry, 0.85, 0.3); },
     cement(rx = 1, ry = 1) { return M.bump('cementRoad', rx, ry, 0.88, 0.3); },
     dirt(rx = 1, ry = 1) { return M.bump('dirtRoad', rx, ry, 0.98, 0.5); },
+    marketGround(rx = 1, ry = 1) {
+      // 不用法线贴图：平铺时法线图边缘会在地上留一条细亮线
+      return M.std(cloneTex('marketGround', rx, ry), { roughness: 0.98 });
+    },
     soil(rx = 1, ry = 1) { return M.bump('soil', rx, ry, 1.0, 0.45); },
     grass(rx = 1, ry = 1) { return M.bump('grass', rx, ry, 1.0, 0.45); },
     bark() { return M.bump('bark', 1, 1, 0.95, 0.8); },
@@ -1033,6 +1160,20 @@
       return M.std(cloneTex('window', 1, 1), { roughness: 0.18, metalness: 0.15, color: 0xffffff });
     },
     straw() { return M.bump('straw', 1, 1, 1.0, 0.6); },
+    /** 褪色帆布：白底织纹 + 颜色染色 */
+    cloth(color = 0xffffff, rx = 1, ry = 1) {
+      const mm = M.bump('cloth', rx, ry, 0.98, 0.18);
+      mm.color = new THREE.Color(color);
+      mm.side = THREE.DoubleSide;
+      return mm;
+    },
+    /** 蓝印花布头巾 */
+    scarf(color = 0x8894a0) {
+      const mm = M.bump('scarf', 2, 2, 0.98, 0.12);
+      mm.color = new THREE.Color(color);
+      mm.side = THREE.DoubleSide;
+      return mm;
+    },
     vegBed(rx = 1, ry = 1) { return M.bump('vegetableBed', rx, ry, 1.0, 0.4); },
     snow(rx = 1, ry = 1) { return M.std(cloneTex('snow', rx, ry), { roughness: 0.75 }); },
 

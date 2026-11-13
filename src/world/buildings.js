@@ -611,6 +611,7 @@
         root.add(ch);
         const cap = G.box(0.7, 0.14, 0.7, m.cement, 0.8);
         cap.position.set(w * 0.3, H + (d / 2) * Math.tan(roofAngle) + 1.42, -d * 0.1);
+        cap.userData.chimney = true;   // 炊烟的出烟口（见 village._buildChimneySmoke）
         root.add(cap);
       }
     }
@@ -730,7 +731,9 @@
       door.position.set(0, 0.1, d / 2 + 0.02); g.add(door);
       // 烟囱
       const ch = G.box(0.42, 2.2, 0.42, m.brickRed, 0.8);
-      ch.position.set(-w * 0.3, h + 1.0, -d * 0.2); g.add(ch);
+      ch.position.set(-w * 0.3, h + 1.0, -d * 0.2);
+      ch.userData.chimney = true;   // 灶屋烟囱：炊烟的出烟口
+      g.add(ch);
       // 柴堆
       const wood = G.cyl(0.5, 0.55, 1.3, m.wood, 10);
       wood.rotation.z = Math.PI / 2;

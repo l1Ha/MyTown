@@ -80,9 +80,14 @@
       for (let i = 0; i < 3; i++) {
         const a = i / 3 * TAU + 0.6;
         const g = new THREE.Group();
-        const stone = B.box(1.3, 0.42, 0.48, MT.M().stone, 0.8);
-        stone.position.set(0, 0.21, 0); stone.castShadow = true; stone.receiveShadow = true;
-        g.add(stone);
+        // 石凳：座板 + 两条石腿（原来是一整块白色方块）
+        const benchMat = MT.mat.solid(0x8d8778, { roughness: 1.0 });
+        const seat = B.box(1.25, 0.16, 0.46, benchMat, 0.9);
+        seat.position.set(0, 0.38, 0); seat.castShadow = true; seat.receiveShadow = true; g.add(seat);
+        for (const sx of [-1, 1]) {
+          const leg = B.box(0.18, 0.34, 0.4, benchMat, 0.7);
+          leg.position.set(sx * 0.45, 0.17, 0); g.add(leg);
+        }
         this.place(g, 6 + Math.cos(a) * 3.0, -41 + Math.sin(a) * 3.0, a);
         MT.props.prop(g);
       }
@@ -264,19 +269,71 @@
       this.poi('oldwell', '老井', '建筑', 14, 24, 4);
 
       // 集市（逢集）
+      const marketBaseY = T.heightAt(-44, -14);
       const market = new THREE.Group();
-      market.position.set(-44, T.heightAt(-44, -14), -14);
-      for (let i = 0; i < 4; i++) {
+      market.position.set(-44, marketBaseY, -14);
+      // 压实的土场：顺着地形微微起伏，把草地变成赶集的场地
+      {
+        const mg = new THREE.PlaneGeometry(11, 25, 11, 25);
+        mg.rotateX(-Math.PI / 2);
+        const mp = mg.attributes.position;
+        for (let i = 0; i < mp.count; i++) {
+          const wx = -44 + mp.getX(i), wz = -14 + mp.getZ(i);
+          mp.setY(i, T.heightAt(wx, wz) - marketBaseY + 0.105);   // 高过土路路面（路面 +0.06），别让车辙穿出来
+        }
+        mg.computeVertexNormals();
+        const padMat = MT.mat.marketGround(2, 5);
+        padMat.color.setHex(0xc4a77c);   // 压实的黄土，略微压暗避免泛白
+        const pad = new THREE.Mesh(mg, padMat);
+        pad.receiveShadow = true;
+        market.add(pad);
+      }
+      for (let i = 0; i < 5; i++) {
         const stall = this._stall(r, i);
-        stall.position.set(0, 0, i * 7 - 10);
-        stall.rotation.y = rad(180 + r.range(-6, 6));
+        stall.position.set(0, 0, i * 5.2 - 10.4);
+        stall.rotation.y = rad(r.range(-6, 6));   // 摊面朝村子（+Z），别让顾客只看到摊背
         market.add(stall);
+      }
+      // 摊边散落的筐、木箱、麻袋
+      for (const [bx, bz, kind] of [[-2.6, -12.2, 'basket'], [2.5, -8.1, 'crate'], [-2.8, -2.9, 'basket'], [2.7, 2.3, 'sack'], [-2.4, 8.0, 'crate'], [2.6, 9.4, 'basket']]) {
+        if (kind === 'basket') {
+          const bk = P.basket(0.28, 0.28); bk.position.set(bx, 0.02, bz); market.add(bk);
+          const fill = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8),
+            new THREE.MeshStandardMaterial({ color: r.pick([0xc8442e, 0xd8b23c, 0x6aa84a]), roughness: 0.85 }));
+          fill.position.set(bx, 0.3, bz); fill.scale.set(1, 0.5, 1); market.add(fill);
+        } else if (kind === 'crate') {
+          const crMat = MT.mat.wood(1.4, 1);
+          crMat.color.setHex(0x9a7448);
+          const cr = B.box(0.5, 0.3, 0.42, crMat, 0.6);
+          cr.position.set(bx, 0.15, bz); cr.rotation.y = r.range(-0.4, 0.4); market.add(cr);
+          // 木箱的板条和角柱
+          for (const sx of [-1, 1]) {
+            const slat = B.box(0.035, 0.3, 0.44, crMat, 0.4);
+            slat.position.set(bx + sx * 0.23, 0.15, bz); slat.rotation.y = cr.rotation.y; market.add(slat);
+          }
+          for (const yy of [0.06, 0.24]) {
+            const band = B.box(0.52, 0.025, 0.44, crMat, 0.3);
+            band.position.set(bx, yy, bz); band.rotation.y = cr.rotation.y; market.add(band);
+          }
+        } else {
+          const sk = new THREE.Group();
+          const skBody = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), MT.M().straw);
+          skBody.position.y = 0.14; skBody.scale.set(1.15, 0.92, 0.95); skBody.castShadow = true;
+          sk.add(skBody);
+          const skNeck = B.cyl(0.04, 0.056, 0.08, MT.M().straw, 8);
+          skNeck.position.y = 0.3; sk.add(skNeck);
+          const skTie = new THREE.Mesh(new THREE.TorusGeometry(0.043, 0.007, 4, 10), MT.M().woodDark);
+          skTie.rotation.x = Math.PI / 2; skTie.position.y = 0.312; sk.add(skTie);
+          sk.position.set(bx, 0, bz); sk.rotation.y = r.range(-0.4, 0.4); market.add(sk);
+        }
       }
       this.group.add(market);
       this.zone(-44, -14, 18);
       this.poi('market', '集市 · 逢集', '风俗', -44, -12, 9);
       this.npc('卖菜婆婆', -46, -10, 'vendor', { lines: 'market' });
       this.npc('李婶', -42, -20, 'vendor', { lines: 'market' });
+      this.npc('赶集的大娘', -47.6, -6.4, 'elder', { lines: 'market' });
+      this.npc('买布的小媳妇', -40.4, -16.2, 'farmer', { lines: 'market' });
       const trike = P.tricycle(true);
       this.place(trike, -54, -12, rad(80));
       const trike2 = P.tricycle(false);
@@ -397,42 +454,250 @@
       this.npc('玩耍的小孩', 20, 24, 'child', { lines: 'well' });
       this.npc('织布奶奶', -16, 14, 'elder', { lines: 'loom', indoor: true });
       this.npc('巡堤的老汉', 4, -186, 'elder', { lines: 'levee' });
+
+      /* ============ 11. 炊烟 ============ */
+      this._buildChimneySmoke();
+    }
+
+    /* ---------------- 炊烟：每个灶屋烟囱飘一股烟 ----------------
+     * 做法参考了开源低多边形乡村项目的做法：不用 Sprite 对象池，
+     * 而是用一组 THREE.Points + 每颗粒子的大小/透明度属性，
+     * 在着色器里用 gl_PointCoord 画柔和圆斑，开销极小。 */
+    _buildChimneySmoke() {
+      const tips = [];
+      const v = new THREE.Vector3();
+      this.group.updateMatrixWorld(true);
+      this.group.traverse((o) => {
+        if (!o.isMesh || !o.userData.chimney || !o.geometry) return;
+        if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+        const bb = o.geometry.boundingBox;
+        v.set((bb.min.x + bb.max.x) / 2, bb.max.y + 0.12, (bb.min.z + bb.max.z) / 2);
+        o.localToWorld(v);
+        tips.push(v.clone());
+      });
+      // 同一个烟囱的囱身与囱帽离得很近，合并成一个出烟口
+      const merged = [];
+      for (const p of tips) {
+        const near = merged.find((q) => q.distanceTo(p) < 1.4);
+        if (near) { if (p.y > near.y) near.copy(p); } else merged.push(p.clone());
+      }
+      const list = merged.slice(0, 10);
+      if (!list.length) return;
+
+      const PER = 6;
+      const N = list.length * PER;
+      const pos = new Float32Array(N * 3);
+      const size = new Float32Array(N);
+      const alpha = new Float32Array(N);
+      const seed = new Float32Array(N);
+      const age = new Float32Array(N);
+      for (let i = 0; i < N; i++) {
+        seed[i] = Math.random() * TAU;
+        age[i] = (i % PER) / PER;           // 每股烟里的粒子错开，别一起冒
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+      geo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1));
+      const mat = new THREE.ShaderMaterial({
+        uniforms: {
+          uColor: { value: new THREE.Color(0xd9d3c8) },
+          uK: { value: 300 },
+          uOpacity: { value: 0.5 },
+        },
+        vertexShader: `
+          attribute float aSize;
+          attribute float aAlpha;
+          uniform float uK;
+          varying float vA;
+          void main() {
+            vec4 mv = modelViewMatrix * vec4(position, 1.0);
+            gl_Position = projectionMatrix * mv;
+            float d = max(0.8, -mv.z);
+            gl_PointSize = clamp(aSize * uK / d, 2.0, 110.0);
+            vA = aAlpha;
+          }`,
+        fragmentShader: `
+          uniform vec3 uColor;
+          uniform float uOpacity;
+          varying float vA;
+          void main() {
+            float r = length(gl_PointCoord - 0.5) * 2.0;
+            float a = smoothstep(1.0, 0.18, r) * vA * uOpacity;
+            if (a < 0.004) discard;
+            gl_FragColor = vec4(uColor, a);
+          }`,
+        transparent: true,
+        depthWrite: false,
+      });
+      const pts = new THREE.Points(geo, mat);
+      pts.name = '炊烟';
+      pts.frustumCulled = false;
+      this.group.add(pts);
+      this.smoke = { list, PER, N, pos, size, alpha, seed, age, geo, mat, life: 5.0, uK: 300 };
+    }
+
+    /** 炊烟逐帧更新（由 game 的更新循环调用；相机用于把点大小换算成像素） */
+    updateSmoke(dt, camera, viewportH) {
+      const s = this.smoke;
+      if (!s) return;
+      if (camera && viewportH) {
+        s.uK = viewportH / (2 * Math.tan(rad((camera.fov || 60) * 0.5)));
+        s.mat.uniforms.uK.value = s.uK;
+      }
+      const wind = 0.55;   // 缓缓向东南飘
+      for (let e = 0; e < s.list.length; e++) {
+        const o = s.list[e];
+        for (let k = 0; k < s.PER; k++) {
+          const i = e * s.PER + k;
+          s.age[i] += dt / s.life;
+          if (s.age[i] > 1) s.age[i] -= 1;
+          const t = s.age[i];
+          const wob = Math.sin(s.seed[i] + t * 6.0);
+          const wob2 = Math.cos(s.seed[i] * 1.7 + t * 4.3);
+          const wobble = wob * 0.2 * t;
+          s.pos[i * 3] = o.x + wobble + t * wind;
+          s.pos[i * 3 + 1] = o.y + t * 3.2;
+          s.pos[i * 3 + 2] = o.z + wob2 * 0.18 * t + t * wind * 0.4;
+          s.size[i] = 0.28 + t * 1.1;
+          s.alpha[i] = Math.min(t / 0.12, 1) * (1 - t) * (1 - t);
+        }
+      }
+      s.geo.attributes.position.needsUpdate = true;
+      s.geo.attributes.aSize.needsUpdate = true;
+      s.geo.attributes.aAlpha.needsUpdate = true;
     }
 
     /* ---------------- 老井 ---------------- */
     _well() {
       const m = MT.M(), B = MT.Build;
       const g = new THREE.Group();
-      const pad = B.box(3.4, 0.12, 3.4, MT.mat.cement(1, 1), 1.2);
-      pad.position.y = 0.06; g.add(pad);
-      const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.9, 0.95, 16, 1, true), m.stone);
-      ring.position.y = 0.5; ring.castShadow = true; ring.receiveShadow = true;
-      ring.material = new THREE.MeshStandardMaterial({ map: MT.texture.cloneTex('concrete', 3, 1), roughness: 0.95, side: THREE.DoubleSide });
-      g.add(ring);
-      const waterIn = new THREE.Mesh(new THREE.CircleGeometry(0.85, 16), MT.mat.water(0x1f3a3a, 0.95));
-      waterIn.rotation.x = -Math.PI / 2; waterIn.position.y = 0.25;
-      g.add(waterIn);
-      // 井台栏
-      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.09, 6, 18), m.stone);
-      rim.rotation.x = Math.PI / 2; rim.position.y = 0.97; g.add(rim);
-      // 井架与辘轳
-      for (const sx of [-1, 1]) {
-        const post = B.box(0.14, 1.8, 0.14, m.wood, 0.7);
-        post.position.set(sx * 0.82, 1.85, 0); g.add(post);
+      // 井台：旧水泥，不再是发亮的浅蓝大板
+      const padMat = new THREE.MeshStandardMaterial({
+        map: MT.texture.cloneTex('concrete', 2, 2), color: 0xa8a49a, roughness: 1.0,
+      });
+      const pad = B.box(3.0, 0.16, 3.0, padMat, 1.2);
+      pad.position.y = 0.08; g.add(pad);
+      // 井圈：一块块石头砌起来，底下一圈带青苔（原来是光滑水泥圆筒，像个塑料桶）
+      const stoneTex = MT.texture.cloneTex('concrete', 1.6, 0.75);
+      const stoneCols = [0x8a8578, 0x948e80, 0x7d7a6f, 0x8f8a7c, 0x787b68];
+      const stoneMats = stoneCols.map((c) => new THREE.MeshStandardMaterial({
+        map: stoneTex, color: c, roughness: 1.0,
+      }));
+      const mossMat = new THREE.MeshStandardMaterial({ color: 0x68724f, roughness: 1.0 });
+      // 内侧的挡墙：填住石块之间的缝，看起来是灰浆砌的而不是悬空一圈
+      const backing = new THREE.Mesh(new THREE.CylinderGeometry(0.79, 0.82, 0.82, 18, 1, true),
+        new THREE.MeshStandardMaterial({ color: 0x4f4c44, roughness: 1.0, side: THREE.DoubleSide }));
+      backing.position.y = 0.56; backing.receiveShadow = true; g.add(backing);
+      const courses = 3, perCourse = 16;
+      for (let c = 0; c < courses; c++) {
+        const cy = 0.24 + c * 0.28;
+        for (let i = 0; i < perCourse; i++) {
+          const a = (i + (c % 2) * 0.5) / perCourse * TAU;
+          const bw = 0.29 + Math.sin(i * 2.1 + c) * 0.025;
+          const bh = 0.26 + Math.cos(i * 1.7 + c * 2) * 0.018;
+          const bd = 0.17 + Math.sin(i * 3.3 + c) * 0.018;
+          const mossy = c === 0 && (i % 4 === 0 || i % 7 === 0);
+          const blk = B.box(bw, bh, bd,
+            mossy ? mossMat : stoneMats[(i + c * 2) % stoneMats.length], 0.4);
+          const rad2 = 0.855 + (i % 7 === 3 ? 0.018 : 0);
+          blk.position.set(Math.cos(a) * rad2, cy, Math.sin(a) * rad2);
+          blk.rotation.y = Math.PI / 2 - a;
+          blk.rotation.z = rad(1.5) * Math.sin(i * 2.3);
+          blk.castShadow = true; blk.receiveShadow = true;
+          g.add(blk);
+        }
       }
-      const beam = B.cyl(0.08, 0.08, 1.8, m.wood, 8);
-      beam.rotation.z = Math.PI / 2; beam.position.y = 2.7; g.add(beam);
-      const roller = B.cyl(0.12, 0.12, 0.7, m.woodDark, 10);
-      roller.rotation.z = Math.PI / 2; roller.position.y = 2.3; g.add(roller);
-      const crank = B.box(0.5, 0.06, 0.06, m.metalDark, 0.5);
-      crank.position.set(1.0, 2.3, 0.25); crank.rotation.x = rad(20); g.add(crank);
-      const rope = B.cyl(0.015, 0.015, 1.3, MT.mat.solid(0x6b5a3a, { roughness: 1 }), 5);
-      rope.position.set(0.2, 1.6, 0); g.add(rope);
-      const bucket = B.cyl(0.22, 0.18, 0.3, m.metalDark, 10);
-      bucket.position.set(0.2, 0.8, 0); g.add(bucket);
-      // 井边石板 + 水渍
-      const slab = B.box(1.2, 0.1, 1.2, m.stone, 0.9);
-      slab.position.set(-1.6, 0.06, 0.6); g.add(slab);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.075, 6, 22),
+        new THREE.MeshStandardMaterial({ map: stoneTex, color: 0x8a8478, roughness: 0.98 }));
+      rim.rotation.x = Math.PI / 2; rim.position.y = 1.01; rim.castShadow = true; g.add(rim);
+      const waterIn = new THREE.Mesh(new THREE.CircleGeometry(0.8, 18), MT.mat.water(0x1c3333, 0.96));
+      waterIn.rotation.x = -Math.PI / 2; waterIn.position.y = 0.42;
+      g.add(waterIn);
+      // 井边的水渍
+      const stainMat = new THREE.MeshBasicMaterial({ color: 0x5c5a50, transparent: true, opacity: 0.22, depthWrite: false });
+      for (let i = 0; i < 3; i++) {
+        const st = new THREE.Mesh(new THREE.CircleGeometry(0.55 + i * 0.18, 14), stainMat);
+        st.rotation.x = -Math.PI / 2;
+        st.position.set(-1.05 + i * 0.2, 0.161 + i * 0.001, -0.75 + i * 0.3);
+        st.scale.set(1, 0.62, 1);
+        g.add(st);
+      }
+      // 井架：深色老木头（贴图按需生成，不会再变白）
+      const frameMat = new THREE.MeshStandardMaterial({
+        map: MT.texture.cloneTex('wood', 1, 2), color: 0x8a7152, roughness: 0.95,
+      });
+      for (const sx of [-1, 1]) {
+        const post = B.box(0.15, 1.9, 0.15, frameMat, 0.7);
+        post.position.set(sx * 0.85, 1.11, 0); g.add(post);
+        // 斜撑：柱子到横梁
+        const brace = B.box(0.07, 0.62, 0.08, frameMat, 0.4);
+        brace.position.set(sx * 0.62, 1.72, 0); brace.rotation.z = sx * rad(34); g.add(brace);
+      }
+      const beam = B.cyl(0.09, 0.09, 2.0, frameMat, 8);
+      beam.rotation.z = Math.PI / 2; beam.position.y = 2.02; g.add(beam);
+      // 小瓦顶：两坡 + 脊（颜色调亮，避免从下往上看像一块黑板）
+      const roofMat = new THREE.MeshStandardMaterial({
+        map: MT.texture.cloneTex('roofTile', 2, 1), color: 0xb9bec4, roughness: 0.9,
+      });
+      for (const sz of [-1, 1]) {
+        const slope = B.box(2.25, 0.07, 0.82, roofMat, 1.0);
+        slope.position.set(0, 2.32, sz * 0.34);
+        slope.rotation.x = sz * rad(-26);
+        slope.castShadow = true; slope.receiveShadow = true;
+        g.add(slope);
+        // 瓦下的木望板：从下往上看是木头，不再是一块黑瓦板
+        const soffit = B.box(2.16, 0.022, 0.76,
+          new THREE.MeshStandardMaterial({ map: MT.texture.cloneTex('wood', 2, 1), color: 0x6f5a40, roughness: 1.0 }), 0.5);
+        soffit.position.set(0, 2.278, sz * 0.34);
+        soffit.rotation.x = sz * rad(-26);
+        g.add(soffit);
+        // 瓦垄
+        for (let k = -3; k <= 3; k++) {
+          const tileRidge = B.box(0.075, 0.035, 0.8, roofMat, 0.4);
+          tileRidge.position.set(k * 0.29, 2.365, sz * 0.355);
+          tileRidge.rotation.x = sz * rad(-26);
+          g.add(tileRidge);
+        }
+        // 檐下木椽
+        for (let k = -1; k <= 1; k++) {
+          const rafter = B.box(0.07, 0.06, 0.82, frameMat, 0.4);
+          rafter.position.set(k * 0.74, 2.255, sz * 0.32);
+          rafter.rotation.x = sz * rad(-26);
+          g.add(rafter);
+        }
+        // 檐口封板：让瓦顶有一条清楚的边
+        const eave = B.box(2.3, 0.07, 0.045, new THREE.MeshStandardMaterial({ color: 0x6e6555, roughness: 0.9 }), 0.5);
+        eave.position.set(0, 2.13, sz * 0.725);
+        eave.rotation.x = sz * rad(-26);
+        g.add(eave);
+      }
+      const ridge = B.cyl(0.075, 0.075, 2.36, roofMat, 8);
+      ridge.rotation.z = Math.PI / 2; ridge.position.y = 2.51; g.add(ridge);
+      // 辘轳
+      const roller = B.cyl(0.11, 0.11, 0.82, m.woodDark, 10);
+      roller.rotation.z = Math.PI / 2; roller.position.y = 1.66; g.add(roller);
+      for (const sx of [-1, 1]) {
+        const brk = B.box(0.08, 0.34, 0.14, frameMat, 0.4);
+        brk.position.set(sx * 0.47, 1.87, 0); g.add(brk);
+      }
+      const crank = B.box(0.34, 0.055, 0.055, m.metalDark, 0.5);
+      crank.position.set(1.0, 1.66, 0.22); crank.rotation.x = rad(22); g.add(crank);
+      const crankGrip = B.cyl(0.03, 0.03, 0.16, m.woodDark, 6);
+      crankGrip.rotation.x = Math.PI / 2; crankGrip.position.set(1.0, 1.66, 0.37); g.add(crankGrip);
+      const rope = B.cyl(0.013, 0.013, 0.3, MT.mat.solid(0x7a6542, { roughness: 1 }), 5);
+      rope.position.set(0.06, 1.52, 0); g.add(rope);
+      // 木桶悬在井口上方（原来吊在井圈里面，完全看不见）
+      const bucket = B.cyl(0.17, 0.13, 0.27, m.woodDark, 12);
+      bucket.position.set(0.06, 1.24, 0); g.add(bucket);
+      const bucketRim = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.018, 5, 14), m.metalDark);
+      bucketRim.rotation.x = Math.PI / 2; bucketRim.position.set(0.06, 1.375, 0); g.add(bucketRim);
+      const bucketHandle = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.01, 4, 12, Math.PI), m.metalDark);
+      bucketHandle.position.set(0.06, 1.4, 0); g.add(bucketHandle);
+      // 井边石板
+      const slab = B.box(1.1, 0.1, 1.1,
+        new THREE.MeshStandardMaterial({ color: 0x767268, roughness: 1.0 }), 0.9);
+      slab.position.set(-1.55, 0.16, 0.7); g.add(slab);
       return MT.props.prop(g);
     }
 
@@ -440,53 +705,226 @@
     _stall(rng, i) {
       const m = MT.M(), B = MT.Build, P = MT.props;
       const g = new THREE.Group();
-      // 摊板
-      const tbl = B.box(2.6, 0.08, 1.1, m.wood, 1.0);
+      const kinds = ['vege', 'cloth', 'eggs', 'vege', 'tools'];
+      const kind = kinds[i % kinds.length];
+      const accent = rng.pick([0xa85a4a, 0x5a8a6e, 0x5a7aa0, 0xb08a4a]);
+      const accentMat = MT.mat.cloth(accent, 2, 1.2);   // 褪色帆布，带织纹
+      const clothMat = MT.mat.cloth(0xbfb39b, 1.5, 1.0);   // 桌沿的粗白布，也带织纹
+      const topMat = MT.mat.wood(2, 1);
+      topMat.color.setHex(0x9c7448);                        // 木摊板，不要被晒成白塑料
+
+      // 四根木柱撑起一块布棚（比原来的圆锥伞更像乡村集市摊）
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const back = sz < 0;
+          const postH = back ? 2.18 : 2.02;
+          const post = B.cyl(0.038, 0.044, postH, m.woodDark, 6);
+          post.position.set(sx * 1.28, postH / 2, sz * 0.82);
+          g.add(post);
+        }
+      }
+      // 前后横梁
+      for (const sz of [-1, 1]) {
+        const beam = B.cyl(0.032, 0.032, 2.66, m.woodDark, 6);
+        beam.rotation.z = Math.PI / 2;
+        beam.position.set(0, sz < 0 ? 2.15 : 1.99, sz * 0.82);
+        g.add(beam);
+      }
+      // 布棚：前低后高、中间略微下垂
+      const tarpGeo = new THREE.PlaneGeometry(2.95, 1.95, 10, 6);
+      tarpGeo.rotateX(-Math.PI / 2);
+      {
+        const p = tarpGeo.attributes.position;
+        for (let k = 0; k < p.count; k++) {
+          const x = p.getX(k), z = p.getZ(k);
+          const sag = 0.09 * Math.cos((x / 1.475) * Math.PI / 2) * Math.cos((z / 0.975) * Math.PI / 2);
+          p.setY(k, 2.2 - (z + 0.975) / 1.95 * 0.2 - sag);
+        }
+        tarpGeo.computeVertexNormals();
+      }
+      const tarp = new THREE.Mesh(tarpGeo, accentMat);
+      tarp.castShadow = true; tarp.receiveShadow = true; g.add(tarp);
+      // 前檐垂布 + 檐口木杆
+      const valance = B.plane(2.95, 0.16, accentMat, 1, 1);
+      valance.position.set(0, 1.92, 0.975); g.add(valance);
+      const eaveBar = B.cyl(0.03, 0.03, 2.9, m.woodDark, 6);
+      eaveBar.rotation.z = Math.PI / 2; eaveBar.position.set(0, 2.0, 0.975); g.add(eaveBar);
+      // 挂在檐下的手写招牌
+      const signText = { vege: '自家种的菜', eggs: '土鸡蛋', cloth: '布匹', tools: '农具' }[kind];
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.32), MT.texture.textMat(signText, {
+        key: 'stall-' + kind, w: 384, h: 144, bg: '#e8dfc8', color: '#3a2c22', fontSize: 58, border: false, grain: false,
+      }));
+      sign.position.set(0, 1.73, 0.99); g.add(sign);
+      for (const sx of [-1, 1]) {
+        const string = B.cyl(0.005, 0.005, 0.15, m.woodDark, 4);
+        string.position.set(sx * 0.36, 1.9, 0.99); g.add(string);
+      }
+      // 挂两串干辣椒，摊子更有生活气
+      const chiliMat = new THREE.MeshStandardMaterial({ color: 0xa8301f, roughness: 0.8 });
+      for (const sx of [-1, 1]) {
+        for (let k = 0; k < 4; k++) {
+          const chili = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.09, 6), chiliMat);
+          chili.position.set(sx * 1.16, 1.95 - k * 0.055, 0.86);
+          chili.rotation.x = Math.PI; chili.rotation.z = sx * rad(6);
+          g.add(chili);
+        }
+      }
+
+      // 摊板 + 桌腿 + 粗布桌沿
+      const tbl = B.box(2.7, 0.09, 1.15, topMat, 1.0);
       tbl.position.y = 0.82; g.add(tbl);
+      const frontCloth = B.box(2.7, 0.46, 0.02, clothMat, 1.0);
+      frontCloth.position.set(0, 0.63, 0.585); g.add(frontCloth);
+      const stripe = B.box(2.7, 0.055, 0.022, accentMat, 1.0);
+      stripe.position.set(0, 0.46, 0.588); g.add(stripe);
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-        const leg = B.box(0.08, 0.8, 0.08, m.wood, 0.5);
+        const leg = B.box(0.08, 0.8, 0.08, m.woodDark, 0.5);
         leg.position.set(sx * 1.2, 0.4, sz * 0.45); g.add(leg);
       }
-      // 遮阳伞
-      const pole = B.cyl(0.045, 0.045, 2.4, m.metal, 8);
-      pole.position.set(0, 1.2, -0.6); g.add(pole);
-      const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.9, 0.7, 8),
-        new THREE.MeshStandardMaterial({ color: rng.pick([0x3a5f96, 0xa8321f, 0x2f6b4a]), roughness: 0.9, side: THREE.DoubleSide }));
-      canopy.position.set(0, 2.5, -0.6); g.add(canopy);
-      const trim = new THREE.Mesh(new THREE.TorusGeometry(1.86, 0.05, 4, 8), m.yellow);
-      trim.rotation.x = Math.PI / 2; trim.position.set(0, 2.16, -0.6); g.add(trim);
+      // 桌下的筐、麻袋（麻袋是圆鼓鼓的一袋，不是方块）
+      const under = P.basket(0.26, 0.26); under.position.set(-0.72, 0.02, -0.15); g.add(under);
+      const sack = new THREE.Group();
+      const sackBody = new THREE.Mesh(new THREE.SphereGeometry(0.19, 12, 10), m.straw);
+      sackBody.position.y = 0.16; sackBody.scale.set(1.18, 0.92, 1.0); sackBody.castShadow = true;
+      sack.add(sackBody);
+      const sackNeck = B.cyl(0.045, 0.062, 0.09, m.straw, 8);
+      sackNeck.position.y = 0.33; sack.add(sackNeck);
+      const sackTie = new THREE.Mesh(new THREE.TorusGeometry(0.047, 0.007, 4, 10), m.woodDark);
+      sackTie.rotation.x = Math.PI / 2; sackTie.position.y = 0.345; sack.add(sackTie);
+      sack.position.set(0.75, 0, -0.2); sack.rotation.y = rng.range(-0.3, 0.3); g.add(sack);
+
       // 摊上的货
-      const kinds = ['vege', 'eggs', 'cloth', 'tools'];
-      const kind = kinds[i % kinds.length];
       if (kind === 'vege') {
-        for (let k = 0; k < 8; k++) {
-          const cab = new THREE.Mesh(new THREE.SphereGeometry(rng.range(0.11, 0.17), 8, 6),
-            new THREE.MeshStandardMaterial({ color: rng.pick([0x6aa84a, 0x8fbf60, 0xd8d0a0]), roughness: 0.9 }));
-          cab.position.set(-1.0 + k * 0.28, 0.94, rng.range(-0.3, 0.3));
-          cab.scale.y = 0.85; g.add(cab);
+        const bed = B.box(2.1, 0.02, 0.86, new THREE.MeshStandardMaterial({ color: 0x3f6b3a, roughness: 1 }), 0.5);
+        bed.position.set(-0.1, 0.895, 0); g.add(bed);
+        // 白菜：淡黄菜心 + 外裹几片青叶，不能像一排白蛋
+        const cabInner = new THREE.MeshStandardMaterial({ color: 0xe6eecb, roughness: 0.85 });
+        const cabLeafMats = [0x5f8f3f, 0x6fa04a, 0x548538].map(
+          (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }));
+        const mkCab = (r0) => {
+          const cg = new THREE.Group();
+          const head = new THREE.Mesh(new THREE.SphereGeometry(r0, 10, 8), cabInner);
+          head.scale.set(0.86, 1.16, 0.86); head.position.y = r0 * 0.2;
+          head.castShadow = true; cg.add(head);
+          for (let k = 0; k < 5; k++) {
+            const a = (k / 5) * TAU + rng.range(-0.35, 0.35);
+            const leaf = new THREE.Mesh(new THREE.SphereGeometry(r0 * 0.62, 8, 6),
+              rng.pick(cabLeafMats));
+            leaf.position.set(Math.cos(a) * r0 * 0.44, -r0 * 0.3, Math.sin(a) * r0 * 0.44);
+            leaf.scale.set(0.85, 0.8, 1.05);
+            leaf.rotation.set(Math.sin(a) * 0.5, -a, Math.cos(a) * 0.5);
+            leaf.castShadow = true; cg.add(leaf);
+          }
+          return cg;
+        };
+        for (let row = 0; row < 2; row++) {
+          for (let k = 0; k < 5; k++) {
+            const r0 = rng.range(0.12, 0.15);
+            const cab = mkCab(r0);
+            cab.position.set(-0.96 + k * 0.25 + row * 0.05, 0.9 + r0 * (row ? 1.75 : 0.96), row ? -0.2 : 0.16);
+            cab.rotation.y = rng.range(0, TAU);
+            g.add(cab);
+          }
         }
-        const basket = P.basket(0.35, 0.3); basket.position.set(-1.1, 0.86, -0.0); g.add(basket);
+        for (let k = 0; k < 3; k++) {
+          const r0 = 0.135;
+          const cab = mkCab(r0);
+          cab.position.set(-0.72 + k * 0.25, 0.9 + r0 * 2.45, 0.0);
+          cab.rotation.y = rng.range(0, TAU);
+          g.add(cab);
+        }
+        // 西红柿：装在浅筐里
+        const tomBasket = P.basket(0.27, 0.1); tomBasket.position.set(0.58, 0.9, 0.08); g.add(tomBasket);
+        const tomMat = new THREE.MeshStandardMaterial({ color: 0xc8442e, roughness: 0.55 });
+        for (let k = 0; k < 14; k++) {
+          const tom = new THREE.Mesh(new THREE.SphereGeometry(0.05, 7, 6), tomMat);
+          const a = (k / 14) * TAU, rr = k < 9 ? 0.2 : 0.1;
+          tom.position.set(0.58 + Math.cos(a) * rr, 1.0 + (k < 9 ? 0 : 0.05), 0.08 + Math.sin(a) * rr * 0.85);
+          g.add(tom);
+        }
+        // 黄瓜
+        const cuMat = new THREE.MeshStandardMaterial({ color: 0x4f7f3a, roughness: 0.7 });
+        for (let k = 0; k < 6; k++) {
+          const cu = new THREE.Mesh(new THREE.CapsuleGeometry(0.036, 0.18, 3, 6), cuMat);
+          cu.rotation.z = Math.PI / 2; cu.rotation.y = rng.range(-0.5, 0.5);
+          cu.position.set(0.28 + (k % 3) * 0.045, 0.94 + Math.floor(k / 3) * 0.06, -0.18 - (k % 2) * 0.06); g.add(cu);
+        }
+        const leek = P.basket(0.24, 0.22); leek.position.set(-1.15, 0.9, 0.28); g.add(leek);
+        for (let k = 0; k < 7; k++) {
+          const st = new THREE.Mesh(new THREE.CapsuleGeometry(0.014, 0.36, 3, 5),
+            new THREE.MeshStandardMaterial({ color: 0x6f9a42, roughness: 0.9 }));
+          st.position.set(-1.15 + (k % 3) * 0.04, 1.2, 0.28 + Math.floor(k / 3) * 0.04);
+          st.rotation.z = rng.range(-0.22, 0.22); g.add(st);
+        }
       } else if (kind === 'eggs') {
-        for (let k = 0; k < 12; k++) {
-          const egg = new THREE.Mesh(new THREE.SphereGeometry(0.06, 7, 5),
-            new THREE.MeshStandardMaterial({ color: 0xf0e8d0, roughness: 0.7 }));
-          egg.position.set(-1.0 + (k % 6) * 0.34, 0.9 + Math.floor(k / 6) * 0.09, rng.range(-0.2, 0.2));
-          egg.scale.y = 1.25; g.add(egg);
+        const basket = P.basket(0.38, 0.24); basket.position.set(-0.68, 0.9, 0.02); g.add(basket);
+        const straw = B.cyl(0.34, 0.34, 0.03, m.straw, 12); straw.position.set(-0.68, 0.94, 0.02); g.add(straw);
+        for (let k = 0; k < 14; k++) {
+          const egg = new THREE.Mesh(new THREE.SphereGeometry(0.052, 7, 6),
+            new THREE.MeshStandardMaterial({ color: rng.chance(0.3) ? 0xd8c8a8 : 0xf0e8d0, roughness: 0.65 }));
+          const a = (k / 14) * TAU, rr = k < 8 ? 0.23 : 0.12;
+          egg.position.set(-0.68 + Math.cos(a) * rr, 0.97 + (k < 8 ? 0 : 0.07), 0.02 + Math.sin(a) * rr * 0.8);
+          egg.scale.y = 1.3; g.add(egg);
         }
+        // 第二筐鸭蛋（青壳）
+        const basket2 = P.basket(0.3, 0.2); basket2.position.set(0.12, 0.9, -0.06); g.add(basket2);
+        const straw2 = B.cyl(0.26, 0.26, 0.03, m.straw, 10); straw2.position.set(0.12, 0.94, -0.06); g.add(straw2);
+        for (let k = 0; k < 10; k++) {
+          const egg = new THREE.Mesh(new THREE.SphereGeometry(0.048, 7, 6),
+            new THREE.MeshStandardMaterial({ color: rng.chance(0.4) ? 0x8fa89a : 0xa8c0b0, roughness: 0.6 }));
+          const a = (k / 10) * TAU, rr = k < 6 ? 0.18 : 0.08;
+          egg.position.set(0.12 + Math.cos(a) * rr, 0.97 + (k < 6 ? 0 : 0.06), -0.06 + Math.sin(a) * rr * 0.8);
+          egg.scale.y = 1.3; g.add(egg);
+        }
+        // 一杆小秤
+        const scalePost = B.cyl(0.014, 0.014, 0.5, m.woodDark, 5);
+        scalePost.position.set(0.78, 1.14, 0.16); g.add(scalePost);
+        const scaleBeam = B.box(0.46, 0.018, 0.018, m.woodDark, 0.3);
+        scaleBeam.position.set(0.78, 1.38, 0.16); g.add(scaleBeam);
+        const pan = B.cyl(0.11, 0.09, 0.035, m.metalDark, 10);
+        pan.position.set(0.99, 1.2, 0.16); g.add(pan);
+        const w = B.cyl(0.05, 0.05, 0.06, m.metalDark, 8);
+        w.position.set(0.56, 1.32, 0.16); g.add(w);
       } else if (kind === 'cloth') {
-        for (let k = 0; k < 5; k++) {
-          const cloth = B.box(0.4, 0.04, 0.8, MT.mat.solid(rng.pick([0xb8342a, 0x3a5f96, 0xd8b23c, 0x3f6b3a]), { roughness: 0.95 }), 0.6);
-          cloth.position.set(-1.0 + k * 0.45, 0.88 + k * 0.04, 0); g.add(cloth);
+        // 成卷的布 + 叠好的布匹 + 挂在檐下的布样
+        for (let k = 0; k < 6; k++) {
+          const cm = new THREE.MeshStandardMaterial({ color: rng.pick([0xb8342a, 0x3a5f96, 0xd8b23c, 0x3f6b3a, 0x8a5a8a]), roughness: 0.95 });
+          const roll = B.cyl(0.115, 0.115, 0.9, cm, 10);
+          roll.rotation.z = Math.PI / 2; roll.position.set(-1.05 + k * 0.24, 1.0, -0.12 - (k % 2) * 0.12); g.add(roll);
+        }
+        for (let k = 0; k < 8; k++) {
+          const cm = new THREE.MeshStandardMaterial({ color: rng.pick([0xb8342a, 0x3a5f96, 0xd8b23c, 0x3f6b3a, 0xb06a8a]), roughness: 0.95 });
+          const cloth = B.box(0.52, 0.05, 0.42, cm, 0.6);
+          cloth.position.set(0.6, 0.92 + (k % 4) * 0.052, -0.24 + Math.floor(k / 4) * 0.2);
+          cloth.rotation.y = rng.range(-0.08, 0.08); g.add(cloth);
+        }
+        for (let k = 0; k < 4; k++) {
+          const cm = new THREE.MeshStandardMaterial({ color: rng.pick([0xb8342a, 0x3a5f96, 0xd8b23c, 0x8a5a8a]), roughness: 0.95, side: THREE.DoubleSide });
+          const sample = B.plane(0.2, 0.52, cm, 1, 1);
+          sample.position.set(-0.9 + k * 0.42, 1.7, 0.93);
+          sample.rotation.y = rad(rng.range(-6, 6));
+          g.add(sample);
         }
       } else {
         for (let k = 0; k < 4; k++) {
-          const hoe = B.cyl(0.03, 0.03, 1.1, m.wood, 6);
-          hoe.position.set(-0.9 + k * 0.6, 0.86, 0.1); hoe.rotation.x = Math.PI / 2;
-          hoe.rotation.z = rad(90); g.add(hoe);
-          const head = B.box(0.06, 0.14, 0.2, m.metalDark, 0.4);
-          head.position.set(-1.35 + k * 0.6, 0.86, 0.1); g.add(head);
+          const shaft = B.cyl(0.022, 0.025, 1.1, m.woodDark, 6);
+          shaft.position.set(-0.95 + k * 0.34, 0.95, 0.02); shaft.rotation.x = Math.PI / 2; g.add(shaft);
+          const head = B.box(0.055, 0.13, 0.2, m.metalDark, 0.4);
+          head.position.set(-1.03 + k * 0.34, 0.95, 0.5); head.rotation.x = rad(90); g.add(head);
+        }
+        for (let k = 0; k < 3; k++) {
+          const coil = new THREE.Mesh(new THREE.TorusGeometry(0.09 + k * 0.025, 0.02, 5, 12), m.straw);
+          coil.rotation.x = Math.PI / 2; coil.position.set(0.72, 0.9 + k * 0.02, -0.05); g.add(coil);
         }
       }
+      // 摊前的长凳
+      const bench = new THREE.Group();
+      const seat = B.box(1.1, 0.07, 0.3, m.woodDark, 0.6); seat.position.y = 0.42; bench.add(seat);
+      for (const sx of [-1, 1]) {
+        const leg = B.box(0.07, 0.42, 0.26, m.woodDark, 0.4);
+        leg.position.set(sx * 0.42, 0.21, 0); bench.add(leg);
+      }
+      bench.position.set(0.15, 0, 1.35); bench.rotation.y = rad(-4); g.add(bench);
       return MT.props.prop(g);
     }
 
@@ -563,13 +1001,13 @@
         }
       }
       if (mesh) inner.add(mesh);
-      // 光柱（便于寻找）
+      // 光柱（便于寻找，但在画面里要克制）
       const beamMat = new THREE.MeshBasicMaterial({
-        color: 0xffe6a0, transparent: true, opacity: 0.16, depthWrite: false,
+        color: 0xffe6a0, transparent: true, opacity: 0.07, depthWrite: false,
         blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
       });
-      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 3.4, 12, 1, true), beamMat);
-      beam.position.y = 1.2;
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 2.2, 12, 1, true), beamMat);
+      beam.position.y = 0.85;
       g.add(beam);
       g.userData.collectible = { id, name, taken: false };
       g.userData.spin = inner;

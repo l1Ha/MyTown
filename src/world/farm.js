@@ -11,8 +11,8 @@
   const { rad, lerp, clamp, TAU } = MT.util;
 
   const CROPS = {
-    rice: { name: '水稻', tex: 'cropRice', h: [0.75, 1.05], spacing: 1.25, planes: 2, ground: 0x5c6b3a },
-    wheat: { name: '小麦', tex: 'cropWheat', h: [0.85, 1.15], spacing: 1.1, planes: 2, ground: 0x7a7040 },
+    rice: { name: '水稻', tex: 'cropRice', h: [0.75, 1.05], spacing: 0.9, planes: 2, ground: 0x5c6b3a },
+    wheat: { name: '小麦', tex: 'cropWheat', h: [0.85, 1.15], spacing: 0.95, planes: 2, ground: 0x7a7040 },
     corn: { name: '玉米', tex: 'cropCorn', h: [1.7, 2.2], spacing: 1.7, planes: 2, ground: 0x57603a },
     rape: { name: '油菜', tex: 'cropRape', h: [0.9, 1.25], spacing: 1.15, planes: 2, ground: 0x6b6a34 },
     greens: { name: '蔬菜', tex: 'cropGreens', h: [0.35, 0.5], spacing: 0.85, planes: 2, ground: 0x5b4a34 },
@@ -159,7 +159,7 @@
       for (const key in CROPS) {
         const c = CROPS[key];
         const h = (c.h[0] + c.h[1]) / 2;
-        const geo = G.crossedGeo(0.9, h, c.planes);
+        const geo = G.crossedGeo(1.05, h, c.planes);
         const mat = new THREE.MeshStandardMaterial({
           map: MT.tex[c.tex](), alphaTest: 0.38, transparent: false,
           side: THREE.DoubleSide, roughness: 1.0, color: 0xffffff,
@@ -227,6 +227,11 @@
       const soilT = MT.texture.cloneTex('soil', 1, 1);
       const ridgeT = MT.texture.cloneTex('dirtRoad', 1, 1);
       const waterMat = MT.mat.water(0x3f6360, 0.7);
+      // 秧田水：不要像一块反光塑料板，压暗、减弱天光反射
+      waterMat.color.setHex(0x33564c);
+      waterMat.roughness = 0.26; waterMat.metalness = 0.1;
+      waterMat.envMapIntensity = 0.85; waterMat.opacity = 0.82;
+      if (waterMat.normalScale) waterMat.normalScale.set(0.6, 0.6);
 
       const sampleY = (x, z) => this.terrain.heightAt(x, z);
 
@@ -327,7 +332,7 @@
       this.fieldMat = fieldMat;
       const fields = mkMesh({ pos: posArr, uv: uvArr, nor: norArr, idx: idxArr, col: colArr }, fieldMat, '田块');
       this.group.add(fields);
-      const ridgeMat = new THREE.MeshStandardMaterial({ map: ridgeT, vertexColors: true, roughness: 1.0 });
+      const ridgeMat = new THREE.MeshStandardMaterial({ map: ridgeT, vertexColors: true, roughness: 1.0, color: 0xa07a52 });
       this.ridgeMat = ridgeMat;
       const ridges = mkMesh(ridgeArr, ridgeMat, '田埂');
       this.group.add(ridges);
@@ -467,7 +472,7 @@
       add(66, 40, 68, 300, 2.6);
       add(-96, 60, -98, 260, 2.6);
       add(-300, -70, 300, -72, 2.8);
-      add(-40, -70, -42, 60, 2.6);
+      add(-62, -70, -64, 60, 2.6);   // 西侧支渠：绕开集市土场（原来从集市中心穿过）
       add(120, -70, 122, 40, 2.4);
     }
 
