@@ -323,7 +323,7 @@
         const branchSet = new InstSet(branchGeo, trunkMat, list.length * 12, key + '_branch');
         // 树冠
         const cone = spec.leafGeo === 'cone';
-        const cardsPer = cone ? 0 : (this.quality === 'low' ? 10 : this.quality === 'medium' ? 18 : 30);
+        const cardsPer = cone ? 0 : (this.quality === 'low' ? 10 : this.quality === 'medium' ? 22 : 40);
         const leafMat = cone
           ? new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, map: MT.tex.leafCluster() })
           : new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, map: MT.tex.leafCard(), alphaTest: 0.45, side: THREE.DoubleSide });
@@ -334,7 +334,7 @@
           if (nm) { leafMat.normalMap = nm; leafMat.normalScale = new THREE.Vector2(0.7, 0.7); }
         }
         const leafGeo = cone ? coneGeo : leafCardGeo();
-        const cap = list.length * (cone ? (Math.ceil(spec.blobs * blobMul) + 10) : (cardsPer + 14)) + 8;
+        const cap = list.length * (cone ? (Math.ceil(spec.blobs * blobMul) + 10) : (cardsPer + 26)) + 8;
         const leafSet = new InstSet(leafGeo.clone(), leafMat, cap, key + '_leaf');
         // 内芯团块（不透明），保证树冠有实体感
         const coreMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, map: MT.tex.leafCluster() });
@@ -387,7 +387,8 @@
             for (let k = 0; k < cardsPer; k++) {
               const az = rng.next() * TAU;
               const el = (rng.next() - 0.5) * 1.7;
-              const rr = Math.cbrt(rng.next());
+              // 叶子长在受光的外层：半径偏向冠的外缘，冠心交给不透明内芯团块
+              const rr = 0.42 + 0.58 * Math.sqrt(rng.next());
               const bx = p.x + Math.cos(az) * Math.cos(el) * cr * rr;
               const bz = p.z + Math.sin(az) * Math.cos(el) * cr * rr;
               const by = baseY + Math.sin(el) * ch * rr * 0.7 - (willow ? ch * 0.12 : 0);
@@ -414,14 +415,29 @@
               li.rx = rng.range(-0.5, 0.5); li.rz = rng.range(-0.5, 0.5);
               li.sy = rng.range(0.85, 1.1); li.ao = 0.9;
             }
-            // 内芯团块（小一些、多一些，避免大块多面体）
+            // 冠底的垂叶：把树冠下缘打碎，不再是一个光滑的绿馒头
+            if (!willow) {
+              const nDroop = this.quality === 'low' ? 3 : 7;
+              for (let k = 0; k < nDroop; k++) {
+                const az = rng.next() * TAU, rad = cr * rng.range(0.6, 1.0);
+                leafSet.add({
+                  x: p.x + Math.cos(az) * rad,
+                  y: baseY - ch * rng.range(0.28, 0.5),
+                  z: p.z + Math.sin(az) * rad,
+                }, rng.next() * TAU, cr * rng.range(0.28, 0.4), 1, 0);
+                const li = leafSet.items[leafSet.items.length - 1];
+                li.rx = rng.range(-0.9, 0.9); li.rz = rng.range(-0.9, 0.9);
+                li.sy = rng.range(0.8, 1.0); li.ao = 0.8;
+              }
+            }
+            // 内芯团块（小一些、多一些，缩在冠心，避免大块多面体顶出轮廓）
             for (let k = 0; k < 6; k++) {
-              const ca = rng.next() * TAU, ce = (rng.next() - 0.5) * 1.4, crr = Math.cbrt(rng.next()) * 0.58;
+              const ca = rng.next() * TAU, ce = (rng.next() - 0.5) * 1.3, crr = Math.cbrt(rng.next()) * 0.48;
               coreSet.add({
                 x: p.x + Math.cos(ca) * cr * crr,
-                y: baseY + Math.sin(ce) * ch * crr * 0.6,
+                y: baseY + Math.sin(ce) * ch * crr * 0.55,
                 z: p.z + Math.sin(ca) * cr * crr,
-              }, rng.next() * TAU, cr * rng.range(0.4, 0.56), 1, 0);
+              }, rng.next() * TAU, cr * rng.range(0.36, 0.5), 1, 0);
               coreSet.items[coreSet.items.length - 1].ao = 0.42 + 0.58 * crr;
             }
           }
@@ -575,15 +591,19 @@
         side: THREE.DoubleSide, roughness: 1.0, color: 0xffffff,
       });
       MT.windMaterial(mat, 0.1);
-      const N = this.quality === 'low' ? 1200 : 3400;
+      const N = this.quality === 'low' ? 1300 : 4200;
       const set = new InstSet(geo, mat, N, 'reed');
       let tries = 0;
       while (set.items.length < N && tries < N * 8) {
         tries++;
         let x, z;
-        if (r.chance(0.72)) { // 河滩
+        const pick2 = r.next();
+        if (pick2 < 0.55) { // 河滩
           x = r.range(-340, 340);
           z = MT.TerrainConst.RIVER_Z + r.range(-70, 70);
+        } else if (pick2 < 0.82) { // 淮河大堤南坡的坡脚（渡口一带原来是一片光秃秃的沙土坡）
+          x = r.range(-320, 320);
+          z = -202 + r.range(-9, 14);
         } else { // 水塘边
           const p = r.pick(MT.TerrainConst.PONDS);
           const a = r.next() * TAU, d = p.r * r.range(1.0, 1.4);
@@ -791,8 +811,8 @@
       const baseCol = new THREE.Color(0x4f8a3a);
       for (let i = 0; i < 20; i++) {
         const a = r.next() * TAU;
-        const d = Math.sqrt(r.next()) * 4.4;
-        const sz = r.range(1.25, 2.3);
+        const d = Math.cbrt(r.next()) * 3.5;   // 团块缩在冠心，外层交给叶卡片
+        const sz = r.range(1.15, 2.1);
         const bg = this._lumpyGeo(2, 40 + i);
         bg.scale(sz * r.range(0.9, 1.15), sz * r.range(0.8, 1.0), sz * r.range(0.9, 1.15));
         const bm = new THREE.MeshStandardMaterial({
@@ -813,10 +833,12 @@
         color: 0xffffff, roughness: 0.9, map: MT.tex.leafCard(), alphaTest: 0.45, side: THREE.DoubleSide,
       });
       MT.windMaterial(cardMat, 0.055);
-      const cards = new InstSet(leafCardGeo(), cardMat, 72, 'bigtree_leaf');
-      for (let i = 0; i < 64; i++) {
+      const cards = new InstSet(leafCardGeo(), cardMat, 110, 'bigtree_leaf');
+      for (let i = 0; i < 96; i++) {
         const a = r.next() * TAU;
-        const d = Math.sqrt(r.next()) * 5.0;
+        // 大部分卡片布在冠的外缘（受光的叶幕），少量藏在里面补洞
+        const outer = r.chance(0.82);
+        const d = outer ? (3.0 + Math.sqrt(r.next()) * 2.5) : Math.sqrt(r.next()) * 3.0;
         const s = r.range(1.0, 1.8);
         cards.add(
           { x: Math.cos(a) * d, y: H * 0.8 + r.range(-2.1, 2.4), z: Math.sin(a) * d },

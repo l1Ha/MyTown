@@ -253,7 +253,10 @@
       this.poi('levee', '淮河大堤', '自然', 0, -186, 10);
       for (let x = -300; x <= 300; x += 100) {
         const stone = B.box(0.5, 0.9, 0.2, MT.M().stone, 0.6);
-        stone.position.set(x, T.heightAt(x, -186) + 0.45, -188.6);
+        // 立在堤顶靠村一侧：按自己脚下的地形高度放，别按堤心高度，
+        // 否则会悬在迎水坡上方，从河面看是一个"飘在空中的白板"
+        const sz = -184.4;
+        stone.position.set(x, T.heightAt(x, sz) + 0.44, sz);
         this.group.add(MT.props.prop(stone));
       }
 
