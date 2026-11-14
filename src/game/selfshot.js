@@ -58,10 +58,10 @@
     });
     // 3~8. 主要地点
     const add = (v) => { if (v) out.push(v); };
-    // 集市：从村里看向摊位正面，机位略高，能看到布棚和桌面货物
-    out.push({ id: 'market', label: '集市摊位', pos: [-37, 3.3, -6.2], look: [-44.5, 1.15, -14], fov: 58 });
-    // 单个摊位正面近景：看清招牌、布棚、桌面货物
-    out.push({ id: 'stall', label: '摊位近景', pos: [-44.4, 1.72, -5.5], look: [-44.5, 1.18, -8.8], fov: 52 });
+    // 集市：站在摊位外侧的过道里，斜看一整排摊面（6 个摊位现在朝村子一字排开）
+    out.push({ id: 'market', label: '集市摊位', pos: [-40.2, 1.72, -0.8], look: [-45.2, 1.0, -16.5], fov: 62 });
+    // 单个摊位正面近景：对着豆腐摊，看清招牌、布棚、桌面货物
+    out.push({ id: 'stall', label: '摊位近景', pos: [-44.4, 1.7, -8.6], look: [-44.5, 1.05, -11.0], fov: 52 });
     add(poiView(this, 'oldwell', '老井', { dist: 7, camH: 2.2, lookH: 1.3, fov: 52 }));
     add(poiView(this, 'hall', '任氏宗祠', { camH: 4.2, lookH: 3.0, fov: 60 }));
     add(poiView(this, 'school', '村小学', { camH: 4.6, lookH: 3.0, fov: 60 }));

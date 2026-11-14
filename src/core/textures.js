@@ -889,33 +889,66 @@
     }),
     cropRice: () => tex('cropRice', qsize(512), (ctx, s) => {
       baseFill(ctx, s, [118, 158, 68], 0.3);
-      for (let i = 0; i < 26; i++) {
-        const x0 = s * (0.04 + Math.random() * 0.92);
-        const h = s * (0.58 + Math.random() * 0.42);
-        const lean = (Math.random() - 0.5) * s * 0.3;
-        const k = 0.68 + Math.random() * 0.5;
-        ctx.strokeStyle = `rgba(${(112 * k) | 0},${(166 * k) | 0},${(62 * k) | 0},0.96)`;
-        ctx.lineWidth = 4.2;
-        ctx.beginPath(); ctx.moveTo(x0, s);
-        ctx.quadraticCurveTo(x0 + lean * 0.4, s - h * 0.55, x0 + lean, s - h);
-        ctx.stroke();
-        // 稻叶：每株多几片，别像一根根细针
-        for (let a = 0; a < 3; a++) {
-          const yy = s - h * (0.38 + a * 0.18), dir = (a % 2 ? 1 : -1) * (0.7 + Math.random() * 0.6);
-          ctx.strokeStyle = `rgba(${(92 * k) | 0},${(142 * k) | 0},${(54 * k) | 0},0.92)`; ctx.lineWidth = 2.6;
-          ctx.beginPath(); ctx.moveTo(x0 + lean * 0.3, yy);
-          ctx.quadraticCurveTo(x0 + dir * 18, yy - 10, x0 + dir * 30, yy + 4); ctx.stroke();
-        }
-        // 稻穗（下垂）
-        ctx.strokeStyle = `rgba(${(192 * k) | 0},${(198 * k) | 0},${(112 * k) | 0},0.92)`;
-        ctx.lineWidth = 4.2;
+      // 一片披针形的稻叶：从根部往外弯，尖端收细
+      const blade = (x0, y0, len, ang, w, col) => {
+        const tipX = x0 + Math.sin(ang) * len, tipY = y0 - Math.cos(ang) * len;
+        const mx = x0 + Math.sin(ang) * len * 0.5 - Math.cos(ang) * len * 0.16;
+        const my = y0 - Math.cos(ang) * len * 0.5 - Math.sin(ang) * len * 0.16;
+        ctx.fillStyle = col;
         ctx.beginPath();
-        ctx.moveTo(x0 + lean, s - h);
-        ctx.quadraticCurveTo(x0 + lean + 12, s - h + 9, x0 + lean + 6, s - h + 22);
+        ctx.moveTo(x0 - w / 2, y0);
+        ctx.quadraticCurveTo(mx - w * 0.75, my, tipX, tipY);
+        ctx.quadraticCurveTo(mx + w * 0.75, my, x0 + w / 2, y0);
+        ctx.closePath(); ctx.fill();
+      };
+      // 一穗稻：细细的穗轴 + 两排谷粒，往下垂
+      const panicle = (x, y, k) => {
+        const droop = 16 + Math.random() * 14;
+        ctx.strokeStyle = `rgba(${(180 * k) | 0},${(186 * k) | 0},${(108 * k) | 0},0.95)`;
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(x + droop * 0.4, y + droop * 0.35, x + droop * 0.75, y + droop);
         ctx.stroke();
-        // 谷粒
-        ctx.fillStyle = `rgba(${(206 * k) | 0},${(200 * k) | 0},${(126 * k) | 0},0.9)`;
-        for (let a = 0; a < 6; a++) { ctx.beginPath(); ctx.arc(x0 + lean + 4 + a * 1.6, s - h + 5 + a * 3.6, 2.2, 0, 7); ctx.fill(); }
+        const n = 9;
+        for (let a = 0; a < n; a++) {
+          const t = a / (n - 1);
+          const gx = x + droop * 0.75 * t, gy = y + droop * t;
+          const gk = 0.8 + t * 0.35;
+          ctx.fillStyle = `rgba(${(214 * gk) | 0},${(204 * gk) | 0},${(132 * gk) | 0},0.95)`;
+          for (const side of [-1, 1]) {
+            ctx.beginPath();
+            ctx.ellipse(gx + side * 3.1, gy + 1.5, 2.6, 3.6, side * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      };
+      for (let i = 0; i < 20; i++) {
+        const x0 = s * (0.04 + Math.random() * 0.92);
+        const h = s * (0.62 + Math.random() * 0.38);
+        const lean = (Math.random() - 0.5) * s * 0.26;
+        const k = 0.7 + Math.random() * 0.46;
+        const green = `rgba(${(104 * k) | 0},${(162 * k) | 0},${(58 * k) | 0},0.97)`;
+        const dark = `rgba(${(84 * k) | 0},${(136 * k) | 0},${(48 * k) | 0},0.95)`;
+        // 一丛稻：中间几片直立，外侧几片披散
+        const nb = 5 + ((Math.random() * 3) | 0);
+        for (let b = 0; b < nb; b++) {
+          const t = (b / (nb - 1)) * 2 - 1;                 // -1..1
+          const ang = t * (0.5 + Math.random() * 0.35) + lean / s * 0.5;
+          const len = h * (b === Math.floor(nb / 2) ? 1.0 : 0.72 + Math.random() * 0.3) * (1 - Math.abs(t) * 0.18);
+          blade(x0 + t * 5, s * 0.98, len, ang, 4.6 - Math.abs(t) * 1.4, b % 2 ? green : dark);
+        }
+        // 抽穗：熟一点的多给两穗
+        const heads = 2 + ((Math.random() * 2) | 0);
+        for (let p = 0; p < heads; p++) {
+          panicle(x0 + lean * 0.8 + (Math.random() - 0.5) * 10, s - h * (0.9 + Math.random() * 0.08), k);
+        }
+      }
+      // 叶尖的一点枯黄，让稻田不至于一片死绿
+      ctx.strokeStyle = 'rgba(196,186,104,0.35)'; ctx.lineWidth = 1.6;
+      for (let i = 0; i < 90; i++) {
+        const x = Math.random() * s, y = s * (0.05 + Math.random() * 0.3);
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (Math.random() - 0.5) * 8, y - 8); ctx.stroke();
       }
     }),
     cropCorn: () => tex('cropCorn', qsize(256), (ctx, s) => {

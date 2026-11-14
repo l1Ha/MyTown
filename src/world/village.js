@@ -291,9 +291,9 @@
         pad.receiveShadow = true;
         market.add(pad);
       }
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 6; i++) {
         const stall = this._stall(r, i);
-        stall.position.set(0, 0, i * 5.2 - 10.4);
+        stall.position.set(0, 0, i * 4.6 - 11.5);
         stall.rotation.y = rad(r.range(-6, 6));   // 摊面朝村子（+Z），别让顾客只看到摊背
         market.add(stall);
       }
@@ -708,7 +708,7 @@
     _stall(rng, i) {
       const m = MT.M(), B = MT.Build, P = MT.props;
       const g = new THREE.Group();
-      const kinds = ['vege', 'cloth', 'eggs', 'vege', 'tools'];
+      const kinds = ['vege', 'cloth', 'eggs', 'tofu', 'tools', 'live'];
       const kind = kinds[i % kinds.length];
       const accent = rng.pick([0xa85a4a, 0x5a8a6e, 0x5a7aa0, 0xb08a4a]);
       const accentMat = MT.mat.cloth(accent, 2, 1.2);   // 褪色帆布，带织纹
@@ -753,7 +753,7 @@
       const eaveBar = B.cyl(0.03, 0.03, 2.9, m.woodDark, 6);
       eaveBar.rotation.z = Math.PI / 2; eaveBar.position.set(0, 2.0, 0.975); g.add(eaveBar);
       // 挂在檐下的手写招牌
-      const signText = { vege: '自家种的菜', eggs: '土鸡蛋', cloth: '布匹', tools: '农具' }[kind];
+      const signText = { vege: '自家种的菜', eggs: '土鸡蛋', cloth: '布匹', tools: '农具', tofu: '豆腐', live: '活禽' }[kind];
       const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.32), MT.texture.textMat(signText, {
         key: 'stall-' + kind, w: 384, h: 144, bg: '#e8dfc8', color: '#3a2c22', fontSize: 58, border: false, grain: false,
       }));
@@ -908,6 +908,88 @@
           sample.rotation.y = rad(rng.range(-6, 6));
           g.add(sample);
         }
+      } else if (kind === 'tofu') {
+        // 豆腐摊：湿布上一板白豆腐 + 木模 + 压石 + 水桶
+        const clothGreen = new THREE.MeshStandardMaterial({ color: 0xa8ae9a, roughness: 1.0 });
+        const wetCloth = B.box(2.2, 0.015, 0.9, clothGreen, 0.6);
+        wetCloth.position.set(-0.15, 0.9, 0); g.add(wetCloth);
+        const tofuMat = new THREE.MeshStandardMaterial({ color: 0xf4efe0, roughness: 0.55 });
+        // 左上角一板没切的：木框里整齐的方块
+        const moldMat = MT.mat.wood(1.2, 1); moldMat.color.setHex(0xb08a5a);
+        const mold = B.box(0.52, 0.1, 0.42, moldMat, 0.5);
+        mold.position.set(-1.02, 0.96, 0.02); g.add(mold);
+        for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+          const blk = B.box(0.21, 0.075, 0.17, tofuMat, 0.4);
+          blk.position.set(-1.15 + i * 0.25, 1.02, -0.08 + j * 0.2); g.add(blk);
+        }
+        // 中间散卖的几块，叠成一小摞
+        for (let k = 0; k < 5; k++) {
+          const blk = B.box(0.19, 0.07, 0.19, tofuMat, 0.4);
+          blk.position.set(-0.12 + (k % 3) * 0.24, 0.94 + Math.floor(k / 3) * 0.075, 0.16);
+          blk.rotation.y = rng.range(-0.12, 0.12); g.add(blk);
+        }
+        // 压豆腐的石块 + 接水的搪瓷盆
+        const stone = B.box(0.26, 0.14, 0.22, MT.mat.solid(0x8d8a80, { roughness: 1 }), 0.4);
+        stone.position.set(0.62, 0.98, -0.2); stone.rotation.y = rad(9); g.add(stone);
+        const basin = B.cyl(0.2, 0.16, 0.12, MT.mat.solid(0xd8d4cc, { roughness: 0.6 }), 12);
+        basin.position.set(0.95, 0.93, 0.12); g.add(basin);
+        const water = new THREE.Mesh(new THREE.CircleGeometry(0.17, 12), MT.mat.water(0xbcd2d0, 0.9));
+        water.rotation.x = -Math.PI / 2; water.position.set(0.95, 0.98, 0.12); g.add(water);
+        // 桌下的水桶和黄豆袋
+        const bucket = B.cyl(0.22, 0.19, 0.34, MT.mat.solid(0x5f6f63, { roughness: 0.7 }), 12);
+        bucket.position.set(-1.05, 0.17, -0.1); g.add(bucket);
+        const beanBag = new THREE.Group();
+        const bb = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), m.straw);
+        bb.position.y = 0.14; bb.scale.set(1.2, 0.85, 1.0); beanBag.add(bb);
+        beanBag.position.set(0.4, 0, -0.18); g.add(beanBag);
+      } else if (kind === 'live') {
+        // 活禽摊：桌上竹笼装鸡雏，桌下大笼装鸡
+        const bamboo = MT.mat.solid(0xc8b078, { roughness: 0.85 });
+        const mkCage = (w, h, d, chicks) => {
+          const cg = new THREE.Group();
+          const floor = B.box(w, 0.04, d, bamboo, 0.4);
+          floor.position.y = 0.02; cg.add(floor);
+          for (const sx of [-1, 1]) {
+            const side = B.box(0.03, h, d, bamboo, 0.4);
+            side.position.set(sx * (w / 2 - 0.015), h / 2, 0); cg.add(side);
+          }
+          for (const sz of [-1, 1]) {
+            const side = B.box(w, h, 0.03, bamboo, 0.4);
+            side.position.set(0, h / 2, sz * (d / 2 - 0.015)); cg.add(side);
+          }
+          const roof = B.box(w, 0.035, d, bamboo, 0.4);
+          roof.position.y = h; cg.add(roof);
+          // 竖栅条
+          const n = Math.max(3, Math.round(w / 0.11));
+          for (let i = 0; i < n; i++) {
+            const bar = B.cyl(0.012, 0.012, h, bamboo, 5);
+            bar.position.set(-w / 2 + 0.05 + i * ((w - 0.1) / (n - 1)), h / 2, d / 2 - 0.015); cg.add(bar);
+            const bar2 = bar.clone(); bar2.position.z = -(d / 2 - 0.015); cg.add(bar2);
+          }
+          if (chicks) {
+            for (let i = 0; i < chicks; i++) {
+              const chick = rng.chance(0.5) ? P.chicken(rng) : P.duck(rng);
+              chick.position.set(rng.range(-w / 3, w / 3), 0.04, rng.range(-d / 4, d / 4));
+              chick.rotation.y = rng.next() * TAU;
+              chick.scale.setScalar(0.55);
+              cg.add(chick);
+            }
+          }
+          return cg;
+        };
+        const bigCage = mkCage(0.9, 0.5, 0.6, 2);
+        bigCage.position.set(-0.85, 0.9, 0); g.add(bigCage);
+        const smallCage = mkCage(0.6, 0.34, 0.44, 1);
+        smallCage.position.set(0.45, 0.9, -0.1); smallCage.rotation.y = rad(-8); g.add(smallCage);
+        // 桌下的空笼 + 一杆秤
+        const underCage = mkCage(0.7, 0.42, 0.5, 0);
+        underCage.position.set(0.62, 0.02, -0.05); g.add(underCage);
+        const post = B.cyl(0.014, 0.014, 0.5, m.woodDark, 5);
+        post.position.set(-1.15, 1.14, 0.2); g.add(post);
+        const beam = B.box(0.5, 0.018, 0.018, m.woodDark, 0.3);
+        beam.position.set(-1.15, 1.38, 0.2); g.add(beam);
+        const pan = B.cyl(0.12, 0.1, 0.035, m.metalDark, 10);
+        pan.position.set(-0.9, 1.2, 0.2); g.add(pan);
       } else {
         for (let k = 0; k < 4; k++) {
           const shaft = B.cyl(0.022, 0.025, 1.1, m.woodDark, 6);
