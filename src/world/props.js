@@ -414,11 +414,43 @@
       const fender = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.07, 6, 16, Math.PI), green);
       fender.rotation.y = Math.PI / 2; fender.position.set(sx * 0.72, 0.6, -0.55); fender.castShadow = true; g.add(fender);
     }
+    // 车轮：橡胶胎面 + 两侧胎壁 + 银灰轮辋 + 轮毂螺栓 + 人字花纹
+    const rubber = MT.mat.solid(0x2b2d31, { roughness: 0.95 });
+    const rubberD = MT.mat.solid(0x1f2124, { roughness: 0.95 });
+    const rimMat = MT.mat.metal(0xb9bec3, 0.35);
     const wheel = (r, tw, x, z) => {
-      const w = new THREE.Mesh(new THREE.CylinderGeometry(r, r, tw, 18), metal);
-      w.rotation.z = Math.PI / 2; w.position.set(x, r, z); w.castShadow = true;
-      const tread = new THREE.Mesh(new THREE.TorusGeometry(r * 0.98, 0.06, 6, 20), metal);
-      tread.rotation.y = Math.PI / 2; w.add(tread);
+      const w = P.g();
+      w.position.set(x, r, z);
+      const tire = new THREE.Mesh(new THREE.CylinderGeometry(r, r, tw, 20), rubber);
+      tire.rotation.z = Math.PI / 2; tire.castShadow = true; w.add(tire);
+      // 胎壁：比胎面窄一点、颜色更深，让轮子有"厚度"
+      for (const sx of [-1, 1]) {
+        const wall = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.86, r * 0.86, tw * 0.06, 18), rubberD);
+        wall.rotation.z = Math.PI / 2; wall.position.x = sx * (tw / 2 + 0.006); w.add(wall);
+      }
+      // 轮辋（亮银色圆盘）+ 轮毂 + 螺栓
+      for (const sx of [-1, 1]) {
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.52, r * 0.52, tw * 0.1, 16), rimMat);
+        rim.rotation.z = Math.PI / 2; rim.position.x = sx * (tw / 2 + 0.012); w.add(rim);
+      }
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.2, r * 0.2, tw + 0.06, 12), metal);
+      hub.rotation.z = Math.PI / 2; w.add(hub);
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2;
+        const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.03, 6), rimMat);
+        bolt.rotation.z = Math.PI / 2;
+        bolt.position.set(tw / 2 + 0.03, Math.cos(a) * r * 0.3, Math.sin(a) * r * 0.3);
+        w.add(bolt);
+      }
+      // 人字花纹：胎面上的一圈斜条
+      const nT = Math.max(8, Math.round(r * 22));
+      for (let k = 0; k < nT; k++) {
+        const a = (k / nT) * Math.PI * 2;
+        const lug = B().box(tw * 0.92, 0.03, 0.05, rubberD, 0.2);
+        lug.position.set(0, Math.cos(a) * (r + 0.01), Math.sin(a) * (r + 0.01));
+        lug.rotation.x = -a; lug.rotation.y = 0.5;
+        w.add(lug);
+      }
       return w;
     };
     g.add(wheel(0.62, 0.3, -0.72, -0.55));
@@ -433,12 +465,8 @@
     // 拖斗
     const trailer = B().box(1.5, 0.7, 2.4, m.metal, 1.0); trailer.position.set(0, 0.85, -2.6); g.add(trailer);
     const tRail = B().box(1.62, 0.08, 2.5, m.metal, 1.0); tRail.position.set(0, 1.22, -2.6); g.add(tRail);
-    const tw = (x) => {
-      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.22, 16), metal);
-      w.rotation.z = Math.PI / 2; w.position.set(x, 0.38, -2.6); w.castShadow = true;
-      return w;
-    };
-    g.add(tw(-0.82)); g.add(tw(0.82));
+    g.add(wheel(0.38, 0.24, -0.82, -2.6));
+    g.add(wheel(0.38, 0.24, 0.82, -2.6));
     const hitch = B().cyl(0.05, 0.05, 1.1, metal, 6); hitch.rotation.x = Math.PI / 2; hitch.position.set(0, 0.6, -1.4); g.add(hitch);
     for (let i = 0; i < 4; i++) {
       const p = B().box(0.5, 0.3, 0.6, m.straw, 0.5);
@@ -447,60 +475,283 @@
     return prop(g);
   };
 
-  P.stoneRoller = function () { // 石磙（碾场）
+  P.stoneRoller = function () { // 石磙（碾场）：带凿痕的石滚 + 铁轴 + 木碾架
     const m = M(), g = P.g();
-    const roll = B().cyl(0.45, 0.5, 0.85, m.stone, 18);
-    roll.rotation.z = Math.PI / 2; roll.position.y = 0.48; g.add(roll);
-    for (const sx of [-1, 1]) {
-      const disc = B().cyl(0.16, 0.16, 0.06, m.wood, 10);
-      disc.rotation.z = Math.PI / 2; disc.position.set(sx * 0.45, 0.48, 0); g.add(disc);
+    const stoneTex = MT.texture.cloneTex('concrete', 2, 1);
+    const stoneMat = new THREE.MeshStandardMaterial({
+      map: stoneTex, color: 0x9a968b, roughness: 1.0,
+    });
+    const stoneDark = new THREE.MeshStandardMaterial({ map: stoneTex, color: 0x7e7a70, roughness: 1.0 });
+    const R = 0.46, L = 0.86;
+    // 滚身：中间略粗、两头收一点的圆柱（石磙都是这样凿出来的）
+    const drum = B().cyl(R, R * 0.94, L, stoneMat, 20);
+    drum.rotation.z = Math.PI / 2; drum.position.y = R + 0.02;
+    drum.castShadow = true; drum.receiveShadow = true; g.add(drum);
+    // 凿痕：滚身一圈竖向浅槽
+    const nG = 14;
+    for (let i = 0; i < nG; i++) {
+      const a = (i / nG) * Math.PI * 2;
+      const groove = B().box(L * 0.94, 0.022, 0.016, stoneDark, 0.3);
+      groove.position.set(0, R + 0.02 + Math.sin(a) * R * 0.99, Math.cos(a) * R * 0.99);
+      groove.rotation.x = -a;
+      g.add(groove);
     }
-    const axle = B().cyl(0.04, 0.04, 1.3, m.wood, 8);
-    axle.rotation.z = Math.PI / 2; axle.position.y = 0.48; g.add(axle);
+    // 两端的石台肩 + 铁轴头
     for (const sx of [-1, 1]) {
-      const arm = B().cyl(0.045, 0.045, 1.0, m.wood, 8);
-      arm.rotation.x = rad(80); arm.position.set(sx * 0.62, 0.5, 0.5); g.add(arm);
+      const shoulder = B().cyl(R * 0.99, R * 0.9, 0.05, stoneDark, 18);
+      shoulder.rotation.z = Math.PI / 2; shoulder.position.set(sx * (L / 2 + 0.02), R + 0.02, 0); g.add(shoulder);
+      const axleEnd = B().cyl(0.035, 0.035, 0.16, m.metalDark, 10);
+      axleEnd.rotation.z = Math.PI / 2; axleEnd.position.set(sx * (L / 2 + 0.1), R + 0.02, 0); g.add(axleEnd);
+    }
+    // 铁轴
+    const axle = B().cyl(0.032, 0.032, 1.5, m.metalDark, 10);
+    axle.rotation.z = Math.PI / 2; axle.position.y = R + 0.02; g.add(axle);
+    // 木碾架：两侧立板 + 轴孔铁箍 + 前面的牵引横杆
+    for (const sx of [-1, 1]) {
+      const board = B().box(0.05, 0.72, 0.28, m.woodDark, 0.7);
+      board.position.set(sx * (L / 2 + 0.2), 0.5, 0); board.castShadow = true; g.add(board);
+      const brace = B().cyl(0.028, 0.028, 0.62, m.wood, 8);
+      brace.position.set(sx * (L / 2 + 0.2), 1.02, 0.2); brace.rotation.x = rad(38); g.add(brace);
+      const topRail = B().box(0.05, 0.06, 0.9, m.wood, 0.5);
+      topRail.position.set(sx * (L / 2 + 0.2), 1.03, -0.24); g.add(topRail);
+    }
+    const crossRail = B().cyl(0.03, 0.03, (L + 0.5), m.wood, 8);
+    crossRail.rotation.z = Math.PI / 2; crossRail.position.set(0, 1.03, -0.68); g.add(crossRail);
+    // 牵引杆（往前伸，套牲口用的）
+    const bar = B().cyl(0.035, 0.045, 1.15, m.wood, 8);
+    bar.rotation.x = rad(84); bar.position.set(0, 0.92, -1.16); g.add(bar);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.014, 5, 12), m.metalDark);
+    ring.position.set(0, 0.9, -1.72); g.add(ring);
+    return prop(g);
+  };
+
+  P.haystack = function (r, h) { // 草垛：一层层码起来的麦秸垛，顶上压草压帽
+    const m = M(), g = P.g();
+    const R = r || 1.5, H = h || 2.2;
+    const strawD = MT.mat.solid(0xa88c4e, { roughness: 1.0 });
+    // 底层压边（散落的麦秸）
+    const skirt = new THREE.Mesh(new THREE.ConeGeometry(R * 1.12, H * 0.16, 16, 1, true), strawD);
+    skirt.position.y = H * 0.08; skirt.castShadow = true; g.add(skirt);
+    // 主体：三层略带偏心的圆台叠起来，别像一个规整的圆锥
+    const layers = 3;
+    let y = H * 0.05, rr = R;
+    for (let i = 0; i < layers; i++) {
+      // 层与层压得比较紧（只露一小截边），才像码起来的麦秸垛而不是摞盘子
+      const lh = H * (0.44 - i * 0.03);
+      const topR = rr * (0.76 - i * 0.05);
+      const layer = new THREE.Mesh(new THREE.CylinderGeometry(topR, rr, lh, 16, 1), m.straw);
+      layer.position.set(Math.cos(i * 2.1) * R * 0.05, y + lh / 2, Math.sin(i * 2.1) * R * 0.05);
+      layer.rotation.y = i * 0.7;
+      layer.castShadow = true; layer.receiveShadow = true;
+      g.add(layer);
+      y += lh * 0.8; rr = topR;
+    }
+    // 顶帽：一小团收口的草 + 压顶的草绳
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(rr * 1.25, H * 0.2, 12, 1), m.straw);
+    cap.position.y = y + H * 0.09; cap.castShadow = true; g.add(cap);
+    const rope = new THREE.Mesh(new THREE.TorusGeometry(rr * 0.92, 0.02, 5, 14), MT.mat.solid(0xb09a6a, { roughness: 1 }));
+    rope.rotation.x = Math.PI / 2; rope.position.y = y + 0.02; g.add(rope);
+    // 四周戳出来的乱草
+    for (let i = 0; i < 26; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const yy = H * (0.08 + Math.random() * 0.8);
+      const t = yy / H;
+      const rad2 = R * (1.02 - t * 0.55) * (0.9 + Math.random() * 0.2);
+      const stick = B().box(0.02, 0.16 + Math.random() * 0.2, 0.02, m.straw, 0.4);
+      stick.position.set(Math.cos(a) * rad2, yy, Math.sin(a) * rad2);
+      stick.rotation.z = Math.cos(a) * rad(52 + Math.random() * 30);
+      stick.rotation.x = -Math.sin(a) * rad(52 + Math.random() * 30);
+      g.add(stick);
+    }
+    // 靠在垛上的木杈
+    const fork = P.g();
+    const pole = B().cyl(0.025, 0.03, 1.5, m.wood, 8);
+    pole.position.y = 0.75; fork.add(pole);
+    for (const sx of [-1, 1]) {
+      const tine = B().cyl(0.012, 0.016, 0.34, m.wood, 6);
+      tine.position.set(sx * 0.06, 1.62, 0.02); tine.rotation.z = sx * rad(22); fork.add(tine);
+    }
+    fork.position.set(R * 1.0, 0, -R * 0.35);
+    fork.rotation.z = rad(-13); fork.rotation.y = rad(24);
+    g.add(fork);
+    return prop(g);
+  };
+
+  /** 摊晒的粮食：不规则的薄薄一层（带颗粒贴图），边上散落一些
+   *  以前是几个纯色圆片，看起来像地上刷的油漆 */
+  P.grainSpread = function (r) {
+    const g = P.g();
+    const R = r || 2.6;
+    const mat = MT.mat.grain(3, 3);
+    // 不规则外缘：圆盘顶点半径加噪声
+    const geo = new THREE.CircleGeometry(R, 30);
+    const pos = geo.attributes.position;
+    const n = new MT.Noise(Math.round(R * 1000) % 97 + 7);
+    const uv = geo.attributes.uv;
+    for (let i = 1; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i);
+      const a = Math.atan2(y, x);
+      const k = 1 + (n.fbm(Math.cos(a) * 1.6 + 10, Math.sin(a) * 1.6 + 4, 2)) * 0.22;
+      pos.setXY(i, x * k, y * k);
+    }
+    geo.rotateX(-Math.PI / 2);
+    geo.computeVertexNormals();
+    const disc = new THREE.Mesh(geo, mat);
+    disc.position.y = 0.02; disc.receiveShadow = true;
+    g.add(disc);
+    // 中间略厚一点（粮食刚摊开的样子）
+    const mound = new THREE.Mesh(new THREE.SphereGeometry(R * 0.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat);
+    mound.scale.set(1, 0.045, 1); mound.position.y = 0.02; mound.receiveShadow = true;
+    g.add(mound);
+    // 边缘散落的谷粒
+    for (let i = 0; i < 90; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const rr = R * (0.86 + Math.random() * 0.3);
+      const seed = B().box(0.03, 0.012, 0.02, mat, 0.2);
+      seed.position.set(Math.cos(a) * rr, 0.02, Math.sin(a) * rr);
+      seed.rotation.y = Math.random() * Math.PI;
+      g.add(seed);
+    }
+    // 一柄靠着的木推板
+    const pusher = B().box(0.42, 0.04, 0.2, M().wood, 0.6);
+    pusher.position.set(R * 0.75, 0.1, -R * 0.7); pusher.rotation.set(rad(10), rad(24), rad(-16));
+    g.add(pusher);
+    return prop(g);
+  };
+
+  P.grainHeap = function (r, h) { // 粮堆：席子上的一堆粮食 + 木锨和扫帚
+    const m = M(), g = P.g();
+    const R = r || 1.6, H = h || 0.8;
+    const grain = new THREE.MeshStandardMaterial({ color: 0xd9b95c, roughness: 1 });
+    // 底下的苇席（圆席 + 一圈席边）
+    const matDisc = B().cyl(R * 1.18, R * 1.18, 0.02, m.straw, 20);
+    matDisc.position.y = 0.01; matDisc.receiveShadow = true; g.add(matDisc);
+    const matRim = new THREE.Mesh(new THREE.TorusGeometry(R * 1.16, 0.022, 5, 22), MT.mat.solid(0xbfa468, { roughness: 1 }));
+    matRim.rotation.x = Math.PI / 2; matRim.position.y = 0.03; g.add(matRim);
+    // 粮堆：半球 + 顶部收平，表面撒一层颗粒
+    const heap = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), grain);
+    heap.scale.set(R, H, R);
+    heap.position.y = 0.02; heap.castShadow = true; heap.receiveShadow = true; g.add(heap);
+    for (let i = 0; i < 160; i++) {
+      const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random());
+      const px = Math.cos(a) * rr * R * 0.96, pz = Math.sin(a) * rr * R * 0.96;
+      const py = 0.03 + Math.sqrt(Math.max(0, 1 - rr * rr)) * H;
+      const seed = B().box(0.026, 0.012, 0.018, grain, 0.2);
+      seed.position.set(px, py, pz); seed.rotation.y = Math.random() * Math.PI;
+      g.add(seed);
+    }
+    // 木锨：长柄 + 铲板
+    const shovel = P.g();
+    const handle = B().cyl(0.022, 0.026, 1.5, m.wood, 8);
+    handle.position.y = 0.75; shovel.add(handle);
+    const blade = B().box(0.3, 0.03, 0.42, m.wood, 0.6);
+    blade.position.set(0, 0.14, 0.2); blade.rotation.x = rad(12); shovel.add(blade);
+    shovel.position.set(R * 0.95, 0.04, R * 0.8); shovel.rotation.y = rad(-38); shovel.rotation.z = rad(-24);
+    g.add(shovel);
+    // 扫帚：柄 + 竹梢
+    const broom = P.g();
+    const bs = B().cyl(0.02, 0.024, 1.15, m.wood, 8);
+    bs.position.y = 0.62; broom.add(bs);
+    const bristle = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.42, 8), MT.mat.solid(0xc0a25e, { roughness: 1 }));
+    bristle.position.y = 0.2; broom.add(bristle);
+    broom.position.set(-R * 1.0, 0.02, -R * 0.55); broom.rotation.z = rad(18); broom.rotation.y = rad(30);
+    g.add(broom);
+    return prop(g);
+  };
+
+  P.basket = function (r, h) { // 箩筐（竹篾编的：竖向篾条 + 箍圈 + 提手 + 深色内壁）
+    const m = M(), g = P.g();
+    const R = r || 0.3, H = h || 0.3;
+    const splint = MT.mat.solid(0xc9ae74, { roughness: 0.98 });        // 竹篾本色
+    const splintD = MT.mat.solid(0xa2874f, { roughness: 0.98 });       // 阴面 / 箍圈
+    const dark = MT.mat.solid(0x6b5a3c, { roughness: 1.0 });           // 筐里没装满的部分
+    // 筐身：上大下小的圆台
+    const body = B().cyl(R, R * 0.76, H, splint, 16);
+    body.position.y = H / 2; body.castShadow = true; body.receiveShadow = true; g.add(body);
+    // 内壁压暗：从上口往里看不是实心的
+    const cavity = B().cyl(R * 0.9, R * 0.7, H * 0.94, dark, 14);
+    cavity.position.y = H * 0.5; g.add(cavity);
+    const cavityFloor = B().cyl(R * 0.72, R * 0.72, 0.012, dark, 12);
+    cavityFloor.position.y = H * 0.06; g.add(cavityFloor);
+    // 竖向篾条：一圈窄条，编出竖纹
+    const nS = Math.max(8, Math.round(R * 44));
+    for (let i = 0; i < nS; i++) {
+      const a = (i / nS) * Math.PI * 2;
+      const bar = B().box(0.016, H * 0.94, 0.012, i % 2 ? splint : splintD, 0.5);
+      const rr = R * 0.995;
+      bar.position.set(Math.cos(a) * rr, H * 0.5, Math.sin(a) * rr);
+      bar.rotation.y = -a;
+      bar.rotation.z = rad(-4);     // 顺着圆台的收分
+      g.add(bar);
+    }
+    // 上口箍圈 + 中腰箍圈
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.022, 6, 18), splintD);
+    rim.rotation.x = Math.PI / 2; rim.position.y = H; rim.castShadow = true; g.add(rim);
+    const band = new THREE.Mesh(new THREE.TorusGeometry(R * 0.88, 0.014, 5, 16), splintD);
+    band.rotation.x = Math.PI / 2; band.position.y = H * 0.55; g.add(band);
+    // 底圈（筐脚）
+    const foot = new THREE.Mesh(new THREE.TorusGeometry(R * 0.76, 0.018, 5, 14), splintD);
+    foot.rotation.x = Math.PI / 2; foot.position.y = 0.02; g.add(foot);
+    // 两只竹提手
+    for (const sx of [-1, 1]) {
+      const handle = new THREE.Mesh(new THREE.TorusGeometry(R * 0.5, 0.014, 5, 12, Math.PI), splint);
+      handle.position.set(0, H * 0.96, 0);
+      handle.rotation.y = Math.PI / 2;            // 提手立在 Z 方向、跨过筐口
+      handle.position.z = sx * R * 0.72;
+      handle.rotation.x = sx * rad(6);
+      g.add(handle);
     }
     return prop(g);
   };
 
-  P.haystack = function (r, h) { // 草垛
+  P.dogHouse = function () { // 狗窝：砖砌窝身 + 两坡小瓦顶 + 洞口 + 食盆 + 拴狗桩
     const m = M(), g = P.g();
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(r || 1.5, h || 2.2, 14, 3), m.straw);
-    cone.position.y = (h || 2.2) / 2; cone.castShadow = true; cone.receiveShadow = true;
-    g.add(cone);
-    const top = new THREE.Mesh(new THREE.SphereGeometry(r * 0.28, 10, 6), m.straw);
-    top.position.y = (h || 2.2); g.add(top);
-    return prop(g);
-  };
-
-  P.grainHeap = function (r, h) { // 粮堆
-    const m = M(), g = P.g();
-    const geo = new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xd9b95c, roughness: 1 }));
-    mesh.scale.set(r || 1.6, h || 0.8, r || 1.6);
-    mesh.castShadow = true; mesh.receiveShadow = true;
-    g.add(mesh);
-    return prop(g);
-  };
-
-  P.basket = function (r, h) { // 箩筐
-    const m = M(), g = P.g();
-    const b = B().cyl(r, r * 0.8, h, m.straw, 12);
-    b.position.y = h / 2; g.add(b);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(r, 0.025, 5, 14), m.straw);
-    rim.rotation.x = Math.PI / 2; rim.position.y = h; g.add(rim);
-    return prop(g);
-  };
-
-  P.dogHouse = function () { // 狗窝
-    const m = M(), g = P.g();
-    const b = B().box(0.9, 0.6, 0.8, m.wood, 0.6);
-    b.position.y = 0.3; g.add(b);
-    const roof = B().box(1.05, 0.1, 0.95, m.tileBlue, 0.7);
-    roof.position.y = 0.66; roof.rotation.x = rad(12); g.add(roof);
-    const hole = B().plane(0.4, 0.4, m.glassDark, 1, 1);
-    hole.position.set(0, 0.3, 0.41); g.add(hole);
+    const brick = new THREE.MeshStandardMaterial({
+      map: MT.texture.cloneTex('brickRed', 2, 1), color: 0xd8cfc4, roughness: 1.0,
+    });
+    const W = 0.95, D = 0.85, Hh = 0.62;
+    // 窝身
+    const body = B().box(W, Hh, D, brick, 0.9);
+    body.position.y = Hh / 2; body.castShadow = true; body.receiveShadow = true; g.add(body);
+    // 窝口：深色的洞（洞框用青砖压边）
+    const holeDark = B().box(0.44, 0.42, 0.06, MT.mat.solid(0x241d16, { roughness: 1 }), 0.3);
+    holeDark.position.set(0, 0.26, D / 2 + 0.01); g.add(holeDark);
+    for (const sx of [-1, 1]) {
+      const jamb = B().box(0.06, 0.5, 0.08, m.brickGrey, 0.5);
+      jamb.position.set(sx * 0.26, 0.27, D / 2 + 0.02); g.add(jamb);
+    }
+    const lintel = B().box(0.62, 0.07, 0.08, m.brickGrey, 0.5);
+    lintel.position.set(0, 0.53, D / 2 + 0.02); g.add(lintel);
+    // 窝里的干草：洞口露出一层
+    const bed = B().box(0.5, 0.05, 0.3, m.straw, 0.6);
+    bed.position.set(0, 0.08, D / 2 - 0.16); g.add(bed);
+    // 两坡瓦顶 + 瓦脊 + 檐口
+    for (const sz of [-1, 1]) {
+      const slope = B().box(W + 0.24, 0.06, D * 0.62, m.tileBlue, 0.8);
+      slope.position.set(0, Hh + 0.17, sz * D * 0.27);
+      slope.rotation.x = sz * rad(-26);
+      slope.castShadow = true; g.add(slope);
+      const eave = B().box(W + 0.28, 0.05, 0.05, m.tileDark, 0.6);
+      eave.position.set(0, Hh + 0.04, sz * (D * 0.54)); g.add(eave);
+    }
+    const ridge = B().cyl(0.05, 0.05, W + 0.26, m.tileDark, 8);
+    ridge.rotation.z = Math.PI / 2; ridge.position.y = Hh + 0.33; g.add(ridge);
+    // 食盆（搪瓷碗）和啃剩的骨头
+    const bowl = B().cyl(0.13, 0.1, 0.08, MT.mat.solid(0xd6d2c8, { roughness: 0.6 }), 14);
+    bowl.position.set(W / 2 + 0.28, 0.04, D / 2 - 0.1); g.add(bowl);
+    const bowlIn = B().cyl(0.11, 0.11, 0.02, MT.mat.solid(0x8a7a58, { roughness: 1 }), 12);
+    bowlIn.position.set(W / 2 + 0.28, 0.06, D / 2 - 0.1); g.add(bowlIn);
+    // 拴狗的木桩 + 铁链
+    const post = B().cyl(0.06, 0.07, 0.9, m.woodDark, 8);
+    post.position.set(-W / 2 - 0.4, 0.45, D / 2 - 0.2); post.castShadow = true; g.add(post);
+    const chainMat = MT.mat.solid(0x8a8a8a, { roughness: 0.6, metalness: 0.5 });
+    for (let i = 0; i < 7; i++) {
+      const link = new THREE.Mesh(new THREE.TorusGeometry(0.028, 0.009, 4, 8), chainMat);
+      link.position.set(-W / 2 - 0.4 + 0.05, 0.86 - i * 0.055, D / 2 - 0.2 + Math.sin(i) * 0.02);
+      link.rotation.y = i % 2 ? 0 : Math.PI / 2;
+      g.add(link);
+    }
     return prop(g);
   };
 

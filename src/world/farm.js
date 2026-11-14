@@ -353,6 +353,7 @@
       const g = new THREE.Group();
       g.position.set(x, gy, z);
       const R = 15;
+      MT.addBuildZone(x, z, R - 0.5);   // 水泥场里不许长草（草/地被/野花都会避开建设区）
       // 水泥场
       const circle = new THREE.Mesh(new THREE.CircleGeometry(R, 40), MT.mat.cement(4, 4));
       circle.rotation.x = -Math.PI / 2; circle.position.y = 0.06; circle.receiveShadow = true;
@@ -387,14 +388,12 @@
         b.position.set(r.range(-12, 12), 0.06, r.range(-12, 12));
         g.add(b);
       }
-      // 晒着的粮食（薄薄一层）
-      for (let i = 0; i < 4; i++) {
-        const patch = new THREE.Mesh(new THREE.CircleGeometry(r.range(2.2, 3.6), 16),
-          new THREE.MeshStandardMaterial({ color: 0xd8bc62, roughness: 1 }));
-        patch.rotation.x = -Math.PI / 2;
-        patch.position.set(r.range(-10, 10), 0.08, r.range(-10, 10));
-        patch.receiveShadow = true;
-        g.add(patch);
+      // 晒着的粮食：摊开的一层谷粒（不规则边缘 + 颗粒贴图 + 散落谷粒）
+      for (const [px, pz, pr] of [[-2.5, 4.5, 2.8], [5.2, 1.6, 2.2], [-7.5, -6.5, 2.4], [1.0, -4.0, 1.7]]) {
+        const spread = MT.props.grainSpread(pr);
+        spread.position.set(px, 0.07, pz);
+        spread.rotation.y = r.next() * TAU;
+        g.add(spread);
       }
       // 电线杆 + 路灯
       const pole = MT.props.powerPole({ h: 7.5, loudspeaker: true });

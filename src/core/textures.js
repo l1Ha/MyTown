@@ -1032,6 +1032,35 @@
       }
     }),
 
+    /* ---- 摊晒的粮食（谷粒 / 麦粒）---- */
+    grain: () => tex('grain', qsize(512), (ctx, s) => {
+      ctx.fillStyle = '#c9a94f'; ctx.fillRect(0, 0, s, s);
+      // 一层大小不一的谷粒
+      for (let i = 0; i < 5200; i++) {
+        const x = Math.random() * s, y = Math.random() * s;
+        const r = 1.4 + Math.random() * 2.6;
+        const a = Math.random() * Math.PI;
+        const k = 0.72 + Math.random() * 0.55;
+        ctx.fillStyle = `rgba(${(214 * k) | 0},${(186 * k) | 0},${(104 * k) | 0},0.95)`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, r, r * 0.6, a, 0, Math.PI * 2);
+        ctx.fill();
+        // 谷粒尖端的一点高光
+        ctx.fillStyle = `rgba(${(246 * k) | 0},${(226 * k) | 0},${(158 * k) | 0},0.5)`;
+        ctx.beginPath();
+        ctx.ellipse(x - r * 0.25, y - r * 0.25, r * 0.42, r * 0.26, a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // 碎秸秆 / 糠
+      for (let i = 0; i < 160; i++) {
+        const x = Math.random() * s, y = Math.random() * s, len = 4 + Math.random() * 16, a = Math.random() * Math.PI;
+        ctx.strokeStyle = `rgba(${(196 + Math.random() * 40) | 0},${(172 + Math.random() * 30) | 0},${(112 + Math.random() * 30) | 0},0.55)`;
+        ctx.lineWidth = 0.8 + Math.random() * 1.4;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len); ctx.stroke();
+      }
+      grain(ctx, s, 10);
+    }),
+
     /* ---- 芦苇 ---- */
     reed: () => tex('reed', qsize(256), (ctx, s) => {
       baseFill(ctx, s, [124, 138, 82], 0.28);
@@ -1193,6 +1222,7 @@
       return M.std(cloneTex('window', 1, 1), { roughness: 0.18, metalness: 0.15, color: 0xffffff });
     },
     straw() { return M.bump('straw', 1, 1, 1.0, 0.6); },
+    grain(rx = 1, ry = 1) { return M.bump('grain', rx, ry, 1.0, 0.35); },
     /** 褪色帆布：白底织纹 + 颜色染色 */
     cloth(color = 0xffffff, rx = 1, ry = 1) {
       const mm = M.bump('cloth', rx, ry, 0.98, 0.18);
