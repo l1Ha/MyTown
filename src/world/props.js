@@ -63,70 +63,199 @@
     return prop(g);
   };
 
-  P.stoneMill = function () { // 石磨
+  P.stoneMill = function () { // 石磨：木盘托 + 上下石扇（带凿齿、磨眼）+ 磨棍 + 面堆和刷子
     const m = M(), g = P.g();
     const wood = m.wood;
-    // 木架 + 托盘
-    const tray = B().cyl(0.88, 0.88, 0.07, wood, 18); tray.position.y = 0.42; g.add(tray);
+    const stoneTex = MT.texture.cloneTex('concrete', 2, 2);
+    const stoneMat = new THREE.MeshStandardMaterial({ map: stoneTex, color: 0x9d988c, roughness: 1.0 });
+    const stoneDark = new THREE.MeshStandardMaterial({ map: stoneTex, color: 0x87837a, roughness: 1.0 });
+    // 木架：四条腿 + 交叉撑
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
       const leg = B().cyl(0.05, 0.062, 0.42, wood, 8);
       leg.position.set(sx * 0.62, 0.21, sz * 0.62); g.add(leg);
     }
-    // 上下磨盘
-    const lower = B().cyl(0.6, 0.6, 0.16, m.stone, 20); lower.position.y = 0.53; g.add(lower);
-    const upper = B().cyl(0.56, 0.56, 0.22, m.stone, 20); upper.position.y = 0.72; g.add(upper);
-    // 磨盘凿纹
-    for (let i = 0; i < 8; i++) {
-      const a = i * Math.PI / 4;
-      const groove = B().box(0.4, 0.02, 0.03, m.stone, 0.5);
-      groove.position.set(Math.cos(a) * 0.3, 0.835, Math.sin(a) * 0.3);
-      groove.rotation.y = -a; g.add(groove);
+    for (const sz of [-1, 1]) {
+      const brace = B().box(0.05, 0.05, 1.2, m.woodDark, 0.4);
+      brace.position.set(0, 0.2, sz * 0.62); g.add(brace);
     }
-    // 漏斗 + 磨眼
-    const funnel = B().cyl(0.16, 0.05, 0.22, wood, 12); funnel.position.set(0.12, 1.0, 0); g.add(funnel);
-    const eye = B().cyl(0.045, 0.045, 0.3, m.solidMud || m.mud, 8); eye.position.set(0.12, 0.78, 0); g.add(eye);
-    // 磨棍
-    const stick = B().cyl(0.04, 0.045, 0.9, wood, 8); stick.position.set(0.5, 0.98, 0); stick.rotation.z = rad(80); g.add(stick);
-    const handle = B().cyl(0.03, 0.03, 0.3, wood, 8); handle.position.set(0.86, 1.06, 0); handle.rotation.x = rad(90); g.add(handle);
+    // 磨盘（接面）：圆木盘 + 一圈盘沿（面粉不会撒出去）
+    const tray = B().cyl(0.88, 0.88, 0.07, wood, 20); tray.position.y = 0.42; tray.receiveShadow = true; g.add(tray);
+    const trayRim = new THREE.Mesh(new THREE.TorusGeometry(0.88, 0.045, 6, 24), m.woodDark);
+    trayRim.rotation.x = Math.PI / 2; trayRim.position.y = 0.48; g.add(trayRim);
+    const trayEdge = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.1, 20, 1, true), m.woodDark);
+    trayEdge.position.y = 0.45; g.add(trayEdge);
+    // 下扇（固定）
+    const lower = B().cyl(0.6, 0.6, 0.16, stoneMat, 22);
+    lower.position.y = 0.53; lower.castShadow = true; lower.receiveShadow = true; g.add(lower);
+    // 上扇（转动，比下扇略小、略高）
+    const upper = B().cyl(0.545, 0.56, 0.2, stoneMat, 22);
+    upper.position.y = 0.71; upper.castShadow = true; g.add(upper);
+    // 上扇表面：放射状的凿齿（磨齿一组组斜着排）
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const groove = B().box(0.34, 0.016, 0.026, stoneDark, 0.3);
+      groove.position.set(Math.cos(a) * 0.28, 0.815, Math.sin(a) * 0.28);
+      groove.rotation.y = -a + 0.32;      // 斜齿，不是正十字
+      g.add(groove);
+    }
+    // 上下扇之间的一圈磨缝 + 磨眼 + 漏斗
+    const seam = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.012, 5, 22), stoneDark);
+    seam.rotation.x = Math.PI / 2; seam.position.y = 0.62; g.add(seam);
+    const eye = B().cyl(0.045, 0.05, 0.24, stoneDark, 10);
+    eye.position.set(0.19, 0.8, 0); g.add(eye);
+    const funnel = B().cyl(0.17, 0.055, 0.2, wood, 12);
+    funnel.position.set(0.19, 0.94, 0); g.add(funnel);
+    // 磨棍：插在上扇边缘的方孔里，末端有木握把
+    const stick = B().cyl(0.032, 0.04, 0.86, wood, 8);
+    stick.position.set(0.66, 0.92, 0); stick.rotation.z = rad(72); g.add(stick);
+    const pin = B().box(0.05, 0.1, 0.05, m.woodDark, 0.3);
+    pin.position.set(0.53, 0.83, 0); pin.rotation.z = rad(12); g.add(pin);
+    const handle = B().cyl(0.026, 0.026, 0.24, wood, 8);
+    handle.position.set(1.02, 1.06, 0); handle.rotation.x = rad(90); g.add(handle);
+    // 盘上的一小堆面粉 + 刷子 + 靠在架上的罗（筛面箩）
+    const flour = new THREE.Mesh(new THREE.SphereGeometry(0.26, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+      MT.mat.solid(0xe8e2d2, { roughness: 1 }));
+    flour.scale.set(1.15, 0.28, 1); flour.position.set(-0.45, 0.47, 0.42); g.add(flour);
+    const brush = P.g();
+    const bh = B().cyl(0.02, 0.024, 0.26, m.woodDark, 6); bh.position.y = 0.13; brush.add(bh);
+    const bristle = B().box(0.09, 0.05, 0.05, MT.mat.solid(0xc9ad74, { roughness: 1 }), 0.3);
+    bristle.position.y = 0.02; brush.add(bristle);
+    brush.position.set(0.42, 0.47, -0.52); brush.rotation.z = rad(78); brush.rotation.y = rad(-30);
+    g.add(brush);
+    const sifter = B().cyl(0.3, 0.24, 0.14, m.straw, 12);
+    sifter.position.set(-0.86, 0.53, -0.5); sifter.rotation.z = rad(-22);
+    g.add(sifter);
     return prop(g);
   };
 
-  P.jar = function (r, h, color) { // 缸 / 坛子
+  P.jar = function (r, h, color) { // 缸 / 坛子：鼓肚、收口、厚唇、缸脚，水缸里还有水和瓢
     const m = M(), g = P.g();
-    const body = new THREE.Mesh(
-      new THREE.CylinderGeometry(r * 0.86, r * 0.72, h, 14, 1),
-      new THREE.MeshStandardMaterial({ color: color || 0x4a3b2c, roughness: 0.4, metalness: 0.05 })
-    );
-    body.position.y = h / 2; body.castShadow = true; body.receiveShadow = true;
-    g.add(body);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(r * 0.86, r * 0.09, 6, 16), body.material);
-    rim.rotation.x = Math.PI / 2; rim.position.y = h - 0.02; g.add(rim);
-    if (Math.random() < 0.4) { // 盖
-      const lid = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.9, r * 0.85, 0.06, 14), m.wood);
-      lid.position.y = h + 0.03; g.add(lid);
+    const R = r || 0.36, H = h || 0.8;
+    const isWater = Math.random() < 0.45;
+    const glaze = new THREE.MeshStandardMaterial({
+      color: color || (isWater ? 0x4a3b2c : 0x5c4632),
+      roughness: 0.35, metalness: 0.06,
+    });
+    const glazeD = new THREE.MeshStandardMaterial({ color: 0x3a2e22, roughness: 0.45 });
+    // 缸身：鼓肚（用两段圆台拼出弧线）
+    const bellyLo = B().cyl(R, R * 0.62, H * 0.45, glaze, 18);
+    bellyLo.position.y = H * 0.225; bellyLo.castShadow = true; g.add(bellyLo);
+    const bellyHi = B().cyl(R * 0.78, R, H * 0.45, glaze, 18);
+    bellyHi.position.y = H * 0.675; bellyHi.castShadow = true; g.add(bellyHi);
+    const bellyMax = new THREE.Mesh(new THREE.TorusGeometry(R, H * 0.1, 6, 20), glaze);
+    bellyMax.rotation.x = Math.PI / 2; bellyMax.position.y = H * 0.45; g.add(bellyMax);
+    // 缸脚（底圈）
+    const foot = new THREE.Mesh(new THREE.TorusGeometry(R * 0.62, H * 0.035, 5, 16), glazeD);
+    foot.rotation.x = Math.PI / 2; foot.position.y = H * 0.02; g.add(foot);
+    // 缸口：厚唇
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(R * 0.79, H * 0.055, 7, 20), glazeD);
+    rim.rotation.x = Math.PI / 2; rim.position.y = H * 0.98; g.add(rim);
+    // 缸里：水或粮
+    if (isWater) {
+      const water = new THREE.Mesh(new THREE.CircleGeometry(R * 0.72, 16), MT.mat.water(0x2f4a4a, 0.5));
+      water.rotation.x = -Math.PI / 2; water.position.y = H * 0.82; g.add(water);
+      // 葫芦瓢：浮在水面 / 挂在缸沿
+      const gourd = P.g();
+      const gb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 9),
+        MT.mat.solid(0xd8b878, { roughness: 0.7 }));
+      gb.scale.set(1, 0.8, 1); gourd.add(gb);
+      const gneck = B().cyl(0.03, 0.045, 0.07, MT.mat.solid(0xc9a464, { roughness: 0.7 }), 8);
+      gneck.position.set(0.09, 0.05, 0); gourd.add(gneck);
+      gourd.position.set(R * 0.35, H * 0.86, -R * 0.2);
+      gourd.rotation.set(rad(14), rad(30), rad(-10));
+      g.add(gourd);
+    } else if (Math.random() < 0.5) {
+      const grainTop = new THREE.Mesh(new THREE.CircleGeometry(R * 0.72, 14),
+        MT.mat.solid(0xd0b264, { roughness: 1 }));
+      grainTop.rotation.x = -Math.PI / 2; grainTop.position.y = H * 0.84; g.add(grainTop);
     }
+    // 盖：木盖带提手 / 或者一块压缸石
+    const rnd = Math.random();
+    if (rnd < 0.35) {
+      const lid = B().cyl(R * 0.85, R * 0.82, 0.05, m.wood, 16);
+      lid.position.y = H + 0.03; g.add(lid);
+      const knob = B().cyl(0.035, 0.045, 0.06, m.woodDark, 8);
+      knob.position.y = H + 0.08; g.add(knob);
+    } else if (rnd < 0.6) {
+      const stone = B().box(R * 1.1, 0.09, R * 1.1, MT.mat.solid(0x8d8a80, { roughness: 1 }), 0.4);
+      stone.position.y = H + 0.03; stone.rotation.y = rad(12); g.add(stone);
+    }
+    // 缸根的苔痕 / 水渍
+    const stain = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.75, R * 0.8, H * 0.16, 16, 1, true),
+      MT.mat.solid(0x5c5a4a, { roughness: 1 }));
+    stain.position.y = H * 0.09; g.add(stain);
     return prop(g);
   };
 
-  P.laundryLine = function (len) { // 晾衣绳
+  P.laundryLine = function (len) { // 晾衣绳：两根木桩 + 下垂的尼龙绳 + 带褶的衣服和床单
     const m = M(), g = P.g();
+    const L = len || 4;
+    // 木桩（顶上钉了个钉子）
     for (const sx of [-1, 1]) {
       const post = B().box(0.09, 2.3, 0.09, m.wood, 0.6);
-      post.position.set(sx * len / 2, 1.15, 0); g.add(post);
+      post.position.set(sx * L / 2, 1.15, 0); post.castShadow = true; g.add(post);
+      const nail = B().cyl(0.012, 0.012, 0.06, m.metalDark, 6);
+      nail.rotation.z = Math.PI / 2; nail.position.set(sx * (L / 2 - 0.06), 2.12, 0); g.add(nail);
+      const brace = B().box(0.07, 0.07, 0.5, m.woodDark, 0.4);
+      brace.position.set(sx * L / 2, 0.05, 0.2); g.add(brace);
     }
-    const rope = B().cyl(0.014, 0.014, len, m.metalDark, 5);
-    rope.rotation.z = Math.PI / 2; rope.position.y = 2.24; g.add(rope);
-    const cols = [m.cloth, m.clothBlue, m.clothRed, m.cloth, m.clothBlue];
+    // 绳子：中间下垂（用曲线管做出来，不是一根直棍）
+    const sag = Math.max(0.12, L * 0.05);
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-L / 2, 2.12, 0),
+      new THREE.Vector3(-L / 4, 2.12 - sag * 0.6, 0.01),
+      new THREE.Vector3(0, 2.12 - sag, 0.02),
+      new THREE.Vector3(L / 4, 2.12 - sag * 0.6, 0.01),
+      new THREE.Vector3(L / 2, 2.12, 0),
+    ]);
+    const rope = new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.013, 5, false),
+      MT.mat.solid(0x9a8f7a, { roughness: 0.9 }));
+    rope.castShadow = true; g.add(rope);
+    const ropeY = (t) => 2.12 - Math.sin(Math.PI * t) * sag;   // 绳子在某处的高度
+    // 衣服：带褶的布片（布面顶点做正弦起伏），顶上夹两个木夹子
+    const clothMats = [
+      MT.mat.cloth(0xd8d2c4, 2, 2), MT.mat.cloth(0x6f8fb0, 2, 2),
+      MT.mat.cloth(0xb0685c, 2, 2), MT.mat.cloth(0xa8b09a, 2, 2),
+    ];
     const n = 3 + ((Math.random() * 3) | 0);
+    let tCursor = 0.12;
     for (let i = 0; i < n; i++) {
-      const w = 0.5 + Math.random() * 0.5;
-      const h = 0.7 + Math.random() * 0.6;
-      const c = B().plane(w, h, cols[(Math.random() * cols.length) | 0], 1, 1);
-      c.position.set(-len / 2 + (i + 1) * (len / (n + 1)), 2.2 - h / 2, 0.01);
+      const big = i === 0;                                  // 第一件挂被单
+      const w = big ? Math.min(1.5, L * 0.34) : 0.42 + Math.random() * 0.3;
+      const h = big ? 1.5 : 0.62 + Math.random() * 0.55;
+      const geo = new THREE.PlaneGeometry(w, h, 6, 5);
+      const pos = geo.attributes.position;
+      for (let k = 0; k < pos.count; k++) {
+        const x = pos.getX(k), y = pos.getY(k);
+        // 布的褶皱：横向波浪 + 下摆略微收拢
+        pos.setZ(k, Math.sin((x / w) * Math.PI * 2.2 + i) * 0.035
+                  + Math.sin((y / h) * Math.PI * 1.4) * 0.02);
+        if (y < -h * 0.3) pos.setX(k, x * 0.96);
+      }
+      geo.computeVertexNormals();
+      const c = new THREE.Mesh(geo, clothMats[i % clothMats.length]);
+      const t = tCursor + (w / L) * 0.5;
+      tCursor += w / L + 0.06;
+      c.position.set(-L / 2 + t * L, ropeY(t) - h / 2 + 0.02, 0.02);
+      c.rotation.y = (Math.random() - 0.5) * 0.16;
       c.castShadow = true;
       g.add(c);
+      // 木夹子
+      for (const sx of [-1, 1]) {
+        const peg = B().box(0.035, 0.09, 0.03, m.woodDark, 0.3);
+        peg.position.set(-L / 2 + t * L + sx * w * 0.42, ropeY(t) + 0.01, 0.04);
+        g.add(peg);
+      }
     }
-    // 被面 / 床单
+    // 挂在绳头的一条裤子（两条裤腿）
+    const pantMat = MT.mat.cloth(0x4a5a70, 2, 2);
+    for (const sx of [-1, 1]) {
+      const leg = B().plane(0.2, 0.66, pantMat, 1, 1);
+      leg.position.set(-L / 2 + L * 0.92 + sx * 0.11, ropeY(0.92) - 0.33, 0.02);
+      leg.rotation.y = sx * rad(3);
+      leg.castShadow = true;
+      g.add(leg);
+    }
     return prop(g);
   };
 
@@ -228,29 +357,64 @@
         post.position.set(sx * 0.6, 0.82, sz * 1.05); g.add(post);
       }
     }
+    // 车轮：木头辐条轮（木轮辋 + 铁皮箍 + 轮毂 + 12 根辐条）
     const wheel = (x) => {
-      const w = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.055, 6, 18), m.metalDark);
-      w.position.set(x, 0.34, 0); w.rotation.y = Math.PI / 2; w.castShadow = true;
-      const disc = B().cyl(0.29, 0.29, 0.06, m.metalDark, 14);
-      disc.rotation.z = Math.PI / 2; w.add(disc);
+      const w = P.g();
+      w.position.set(x, 0.37, 0);
+      w.rotation.y = Math.PI / 2;
+      const rimWood = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.042, 7, 24), m.wood);
+      rimWood.castShadow = true; w.add(rimWood);
+      const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.372, 0.016, 5, 26), m.metalDark);
+      w.add(hoop);
+      const hub = B().cyl(0.08, 0.08, 0.17, m.woodDark, 12);
+      hub.rotation.z = Math.PI / 2; w.add(hub);
+      const hubBand = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.012, 5, 14), m.metalDark);
+      hubBand.rotation.y = Math.PI / 2; w.add(hubBand);
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2;
+        const sp = B().cyl(0.011, 0.013, 0.28, m.wood, 5);
+        sp.position.set(Math.sin(a) * 0.17, Math.cos(a) * 0.17, 0);
+        sp.rotation.z = -a;
+        w.add(sp);
+      }
       return w;
     };
-    g.add(wheel(-0.72)); g.add(wheel(0.72));
-    const axle = B().cyl(0.04, 0.04, 1.6, m.metalDark, 8);
-    axle.rotation.z = Math.PI / 2; axle.position.set(0, 0.34, 0); g.add(axle);
+    g.add(wheel(-0.74)); g.add(wheel(0.74));
+    // 木轴 + 轴座
+    const axle = B().cyl(0.045, 0.045, 1.62, m.woodDark, 8);
+    axle.rotation.z = Math.PI / 2; axle.position.set(0, 0.37, 0); g.add(axle);
+    // 车把：两根长木 + 布缠的握把 + 横撑
     for (const sx of [-1, 1]) {
-      const shaft = B().cyl(0.04, 0.045, 1.5, m.wood, 8);
-      shaft.rotation.x = rad(84); shaft.position.set(sx * 0.5, 0.56, 1.8); g.add(shaft);
-      const grip = B().cyl(0.05, 0.05, 0.22, m.wood, 8);
-      grip.rotation.x = rad(84); grip.position.set(sx * 0.5, 0.62, 2.55); g.add(grip);
+      const shaft = B().cyl(0.042, 0.05, 1.55, m.wood, 8);
+      shaft.rotation.x = rad(84); shaft.position.set(sx * 0.52, 0.6, 1.85); shaft.castShadow = true; g.add(shaft);
+      const wrap = B().cyl(0.055, 0.055, 0.3, MT.mat.solid(0x8a7a5a, { roughness: 0.95 }), 8);
+      wrap.rotation.x = rad(84); wrap.position.set(sx * 0.52, 0.68, 2.62); g.add(wrap);
     }
-    // 粮食袋 + 绑绳
-    for (let i = 0; i < 3; i++) {
-      const sack = B().box(0.5, 0.36, 0.7, m.straw, 0.5);
-      sack.position.set(-0.3 + i * 0.3, 0.9, -0.6 + i * 0.6);
-      sack.rotation.y = (Math.random() - 0.5) * 0.4; g.add(sack);
+    const barGrip = B().cyl(0.028, 0.028, 1.04, m.wood, 8);
+    barGrip.rotation.z = Math.PI / 2; barGrip.position.set(0, 0.72, 2.62); g.add(barGrip);
+    // 支脚（停车时撑住车把）
+    const propLeg = B().box(0.05, 0.62, 0.05, m.woodDark, 0.4);
+    propLeg.position.set(0.18, 0.33, 1.6); propLeg.rotation.x = rad(-16); g.add(propLeg);
+    // 车上的粮袋（鼓鼓的麻袋 + 扎口）
+    for (const [bx, bz, r] of [[-0.34, -0.62, 0.34], [0.14, -0.72, 0.3], [-0.12, 0.42, 0.32]]) {
+      const sack = P.g();
+      const body = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), m.straw);
+      body.scale.set(1.16, 0.86, 1.0); body.position.y = r * 0.86;
+      body.castShadow = true; sack.add(body);
+      const neck = B().cyl(0.055, 0.075, 0.1, m.straw, 8);
+      neck.position.y = r * 1.66; sack.add(neck);
+      const tie = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.009, 4, 10), m.woodDark);
+      tie.rotation.x = Math.PI / 2; tie.position.y = r * 1.7; sack.add(tie);
+      sack.position.set(bx, 0.68, bz);
+      sack.rotation.y = (Math.random() - 0.5) * 0.5;
+      g.add(sack);
     }
-    const rope = B().box(1.3, 0.02, 0.02, m.wood, 0.4); rope.position.set(0, 0.84, 0.1); g.add(rope);
+    // 捆扎的麻绳：两道拱形绳圈勒在袋子外面
+    for (const bz of [-0.15, 0.45]) {
+      const rope = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.016, 5, 12, Math.PI), m.straw);
+      rope.position.set(0, 0.7, bz);
+      g.add(rope);
+    }
     return prop(g);
   };
 

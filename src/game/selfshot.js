@@ -64,6 +64,8 @@
     out.push({ id: 'stall', label: '摊位近景', pos: [-44.4, 1.7, -8.6], look: [-44.5, 1.05, -11.0], fov: 52 });
     // 打谷场：看石磙、草垛、粮堆、拖拉机、板车（从西南侧看，避开村里的房子）
     out.push({ id: 'threshing', label: '打谷场', pos: [-24, 2.9, 95], look: [-7, 0.7, 82], fov: 62 });
+    // 院落：从院外上方斜看院内——石磨、水缸、柴火垛、玉米架、晾衣绳
+    out.push({ id: 'yard', label: '农家院落', pos: [7.5, 5.2, -2.0], look: [0.0, 0.6, -10.0], fov: 62 });
     add(poiView(this, 'oldwell', '老井', { dist: 7, camH: 2.2, lookH: 1.3, fov: 52 }));
     add(poiView(this, 'hall', '任氏宗祠', { camH: 4.2, lookH: 3.0, fov: 60 }));
     add(poiView(this, 'school', '村小学', { camH: 4.6, lookH: 3.0, fov: 60 }));
