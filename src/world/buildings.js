@@ -928,6 +928,12 @@
           pile.position.set(-(yardW / 2 - 1.1), 0, (yMin + yMax) / 2 - 1.6);
           root.add(pile);
         }
+        if (r.chance(0.6)) {   // 靠在墙根的农具：锄头、铁锹、镰刀、扁担水桶
+          const tools = props.farmTools();
+          tools.position.set(yardW / 2 - 2.7, 0, yMax - 1.1);
+          tools.rotation.y = r.range(-0.35, 0.35);
+          root.add(tools);
+        }
         if (r.chance(0.6)) {
           const dog = props.dogHouse();
           dog.position.set(yardW / 2 - 1.3, 0, yMax - 4.2);
