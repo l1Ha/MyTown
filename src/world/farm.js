@@ -478,7 +478,8 @@
     /* ---------------- 塑料大棚 ---------------- */
     _buildGreenhouses() {
       const T = this.terrain, r = this.rng;
-      const spots = [[112, 96], [128, 112], [-140, 126], [-158, 142], [200, 60]];
+      // 大棚集中成片（卫星图上白色棚膜是挤在一块儿的，不是东一处西一处）
+      const spots = [[112, 96], [126, 106], [140, 96], [112, 118], [98, 108], [126, 128]];
       const plastic = new THREE.MeshStandardMaterial({
         color: 0xdfe8ea, roughness: 0.35, metalness: 0.05,
         transparent: true, opacity: 0.55, side: THREE.DoubleSide,

@@ -192,8 +192,10 @@
       // 淮河大堤两侧防护林
       line([[-480, -212], [480, -212]], () => 'poplar', 9, 2.4, 0.9);
       line([[-480, -160], [480, -160]], () => 'poplar', 11, 3.0, 0.85);
-      // 乡道行道树
-      line([[-480, -44], [480, -8]], (x, z) => (r.chance(0.7) ? 'poplar' : 'locust'), 12, 2.6, 0.8);
+      // 乡道：两侧各一行行道树 + 路肩一行（卫星图上是条"绿色走廊"）
+      line([[-480, -44], [480, -8]], (x, z) => (r.chance(0.7) ? 'poplar' : 'locust'), 10, 2.4, 0.86);
+      line([[-480, -52], [480, -16]], () => 'poplar', 8, 2.2, 0.9);
+      line([[-480, -36], [480, 0]], () => 'poplar', 8, 2.2, 0.9);
       // 村道
       line([[18, -30], [4, 420]], () => (r.chance(0.5) ? 'poplar' : 'locust'), 15, 3.0, 0.6);
       // 田间路
@@ -243,6 +245,19 @@
           const key = r.pick(['locust', 'paulownia', 'poplar', 'peach', 'persimmon', 'locust', 'willow']);
           placements.push({ key, x, z, s: r.range(0.8, 1.15) });
         }
+      }
+
+      /* 2.5 村周树围子：庄台外围一圈杂树，把村子"包"起来（卫星图上庄台四周是一圈深绿） */
+      const ringN = Math.round(170 * this.q);
+      for (let i = 0; i < ringN; i++) {
+        const a = r.next() * TAU;
+        const rad2 = 50 + Math.pow(r.next(), 0.7) * 30;      // 50~80m 的环带
+        const x = MT.TerrainConst.VILLAGE.x + Math.cos(a) * rad2;
+        const z = MT.TerrainConst.VILLAGE.z + Math.sin(a) * rad2;
+        if (inWater(x, z)) continue;
+        if (T.slopeAt(x, z) > 0.45) continue;
+        const key = r.chance(0.55) ? 'poplar' : (r.chance(0.5) ? 'locust' : 'paulownia');
+        placements.push({ key, x, z, s: r.range(0.9, 1.28) });
       }
 
       /* 3. 水边柳树 + 芦苇 */
