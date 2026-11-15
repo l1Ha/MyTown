@@ -601,7 +601,7 @@
       const roofAngle = opts.roofAngle || (style === 'old' ? rad(24) : rad(27));
       roof = G.gableRoof(w, d, H, {
         angle: roofAngle, mat: opts.roofMat || m.tile, wallMat,
-        ridgeMat: m.tileDark, eave: style === 'old' ? 0.5 : 0.6, tile: tileSize,
+        ridgeMat: opts.ridgeMat || m.tileDark, eave: style === 'old' ? 0.5 : 0.6, tile: tileSize,
       });
       root.add(roof);
       // 烟囱（灶屋排烟）
@@ -725,7 +725,15 @@
       const w = 3.6, d = 3.2, h = 2.5;
       const body = G.box(w, h, d, m.brickRed, 1.2);
       body.position.y = h / 2; g.add(body);
-      const roof = G.gableRoof(w, d, h, { angle: rad(24), mat: m.tile, wallMat: m.brickRed, eave: 0.4, tile: 1.4 });
+      // 灶屋顶：一半也换成了彩钢瓦
+      const kSteel = Math.random() < 0.5;
+      const kMat = kSteel
+        ? MT.mat.steelRoof(Math.random() < 0.65 ? 0xa8322a : 0x2f5f86, 2, 1.4)
+        : m.tile;
+      const roof = G.gableRoof(w, d, h, {
+        angle: rad(24), mat: kMat, ridgeMat: kSteel ? kMat : m.tileDark,
+        wallMat: m.brickRed, eave: 0.4, tile: 1.4,
+      });
       g.add(roof);
       const door = G.door(1.1, 1.9, { studs: false });
       door.position.set(0, 0.1, d / 2 + 0.02); g.add(door);
@@ -758,7 +766,9 @@
         pig.position.set(w * 0.08, 0, 0); pig.rotation.y = rad(24);
         g.add(pig);
       }
-      const shedRoof = G.box(w * 0.62, 0.12, d * 0.7, m.tileDark, 1.2);
+      const shedSteel = Math.random() < 0.45;
+      const shedRoof = G.box(w * 0.62, 0.12, d * 0.7,
+        shedSteel ? MT.mat.steelRoof(0x6f7a80, 1.6, 1) : m.tileDark, 1.2);
       shedRoof.position.set(-w * 0.2, 2.45, -d * 0.2); g.add(shedRoof);
       G.soft(shed); G.soft(shedRoof);
     } else if (kind === 'chicken') {
@@ -802,6 +812,17 @@
   G.courtyard = function (rng, opts = {}) {
     const m = M();
     const root = new THREE.Group();
+    // 彩钢瓦：如今豫南一大半平房都换成了红/蓝压型钢板屋顶（卫星图上一眼就能看出来）
+    if (opts.roofMat === undefined && opts.style !== 'old') {
+      const rv = rng.next();
+      if (rv < 0.44) {
+        opts.roofMat = MT.mat.steelRoof(0xa8322a, 3, 2);      // 大红
+        opts.ridgeMat = MT.mat.steelRoof(0x8c2822, 3, 2);
+      } else if (rv < 0.6) {
+        opts.roofMat = MT.mat.steelRoof(0x2f5f86, 3, 2);      // 蓝色
+        opts.ridgeMat = MT.mat.steelRoof(0x26506f, 3, 2);
+      }
+    }
     const house = G.house(opts);
     const hw = house.userData.dims.w, hd = house.userData.dims.d;
     const yardD = opts.yardDepth === undefined ? 7.5 : opts.yardDepth;

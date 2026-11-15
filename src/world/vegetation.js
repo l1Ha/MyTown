@@ -201,6 +201,34 @@
       // 渡口路（柳树多）
       line([[92, -28], [101, -226]], () => 'willow', 13, 3.0, 0.7);
 
+      /* 1.5 田边树行子：沿田块长边镶一行杨树
+       * 卫星图上最显眼的就是"田成方、路成网、树成行"——大田四周多半有一行树 */
+      const farmPlots = MT.farmPlots || [];
+      for (const p of farmPlots) {
+        if (r.chance(0.45)) continue;                  // 只给一部分田镶边
+        const alongX = p.w >= p.d;                     // 沿长边种
+        const side = r.chance(0.5) ? 1 : -1;
+        if (alongX) {
+          const z = p.z + side * (p.d / 2 + 1.3);
+          const n = Math.max(1, Math.floor(p.w / 10));
+          for (let k = 0; k <= n; k++) {
+            const x = p.x - p.w / 2 + (k + 0.5) * (p.w / (n + 1));
+            if (inWater(x, z)) continue;
+            if (T.slopeAt(x, z) > 0.4) continue;
+            placements.push({ key: 'poplar', x, z, s: r.range(0.78, 1.02) });
+          }
+        } else {
+          const x = p.x + side * (p.w / 2 + 1.3);
+          const n = Math.max(1, Math.floor(p.d / 10));
+          for (let k = 0; k <= n; k++) {
+            const z = p.z - p.d / 2 + (k + 0.5) * (p.d / (n + 1));
+            if (inWater(x, z)) continue;
+            if (T.slopeAt(x, z) > 0.4) continue;
+            placements.push({ key: 'poplar', x, z, s: r.range(0.78, 1.02) });
+          }
+        }
+      }
+
       /* 2. 村落内外的杂树（榆、槐、泡桐、果树） */
       const villageCenters = [
         { x: MT.TerrainConst.VILLAGE.x, z: MT.TerrainConst.VILLAGE.z, r: 95, n: Math.round(68 * this.q) },

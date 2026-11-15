@@ -384,6 +384,44 @@
       grain(ctx, s, 10);
     }),
 
+    /* ---- 彩钢瓦（压型钢板屋面）：竖向瓦楞 + 锈迹，颜色在材质里染 ---- */
+    corrugate: () => tex('corrugate', qsize(512), (ctx, s) => {
+      ctx.fillStyle = '#cfd3d6'; ctx.fillRect(0, 0, s, s);
+      // 一排排瓦楞：亮棱 + 暗槽
+      const rib = 26;                       // 一道瓦楞的像素宽度
+      for (let x = 0; x < s; x += rib) {
+        const g = ctx.createLinearGradient(x, 0, x + rib, 0);
+        g.addColorStop(0.00, 'rgba(255,255,255,0.55)');
+        g.addColorStop(0.18, 'rgba(255,255,255,0.22)');
+        g.addColorStop(0.46, 'rgba(96,102,108,0.34)');
+        g.addColorStop(0.72, 'rgba(70,76,82,0.42)');
+        g.addColorStop(1.00, 'rgba(210,214,218,0.35)');
+        ctx.fillStyle = g; ctx.fillRect(x, 0, rib, s);
+        // 板与板之间的搭接线
+        ctx.fillStyle = 'rgba(60,66,72,0.5)';
+        ctx.fillRect(x, 0, 1.5, s);
+      }
+      // 横向的固定螺钉（每块板几颗）
+      for (let y = 26; y < s; y += 96) {
+        for (let x = 12; x < s; x += rib) {
+          const gg = ctx.createRadialGradient(x, y, 0, x, y, 4);
+          gg.addColorStop(0, 'rgba(250,250,250,0.8)');
+          gg.addColorStop(1, 'rgba(70,74,80,0.5)');
+          ctx.fillStyle = gg;
+          ctx.beginPath(); ctx.arc(x, y, 3.4, 0, 7); ctx.fill();
+        }
+      }
+      // 锈迹与划痕
+      splotch(ctx, s, 40, 6, 40, () => ['rgba(140,96,58,0.20)', 'rgba(140,96,58,0)']);
+      splotch(ctx, s, 26, 4, 22, () => ['rgba(120,74,40,0.16)', 'rgba(120,74,40,0)']);
+      for (let i = 0; i < 26; i++) {
+        const x = Math.random() * s, y = Math.random() * s;
+        ctx.strokeStyle = 'rgba(110,116,122,0.25)'; ctx.lineWidth = 1 + Math.random();
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (Math.random() - 0.5) * 8, y + 20 + Math.random() * 40); ctx.stroke();
+      }
+      grain(ctx, s, 10);
+    }),
+
     /* ---- 水泥屋面 / 平顶 ---- */
     concrete: () => tex('concrete', qsize(1024), (ctx, s) => {
       ctx.fillStyle = '#aaa59b'; ctx.fillRect(0, 0, s, s);
@@ -1223,6 +1261,14 @@
     },
     straw() { return M.bump('straw', 1, 1, 1.0, 0.6); },
     grain(rx = 1, ry = 1) { return M.bump('grain', rx, ry, 1.0, 0.35); },
+    /** 彩钢瓦：白底瓦楞贴图染成红/蓝/绿 */
+    steelRoof(color = 0xa8322a, rx = 1, ry = 1) {
+      const mm = M.bump('corrugate', rx, ry, 0.55, 0.5);
+      mm.color = new THREE.Color(color);
+      mm.metalness = 0.25;
+      mm.side = THREE.DoubleSide;
+      return mm;
+    },
     /** 褪色帆布：白底织纹 + 颜色染色 */
     cloth(color = 0xffffff, rx = 1, ry = 1) {
       const mm = M.bump('cloth', rx, ry, 0.98, 0.18);
