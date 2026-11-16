@@ -647,10 +647,20 @@
         } else if (pick2 < 0.82) { // 淮河大堤南坡的坡脚（渡口一带原来是一片光秃秃的沙土坡）
           x = r.range(-320, 320);
           z = -202 + r.range(-9, 14);
-        } else { // 水塘边
+        } else { // 水塘边（方塘按矩形埂取样，别按圆形撒到岸上去）
           const p = r.pick(MT.TerrainConst.PONDS);
-          const a = r.next() * TAU, d = p.r * r.range(1.0, 1.4);
-          x = p.x + Math.cos(a) * d; z = p.z + Math.sin(a) * d;
+          if (p.shape === 'rect') {
+            const side = (r.next() * 4) | 0;
+            const t2 = r.next() * 2 - 1;
+            const off = r.range(0.5, 3.6);
+            if (side === 0) { x = p.x + t2 * p.hw; z = p.z + p.hd + off; }
+            else if (side === 1) { x = p.x + t2 * p.hw; z = p.z - p.hd - off; }
+            else if (side === 2) { x = p.x + p.hw + off; z = p.z + t2 * p.hd; }
+            else { x = p.x - p.hw - off; z = p.z + t2 * p.hd; }
+          } else {
+            const a = r.next() * TAU, d = p.r * r.range(1.0, 1.4);
+            x = p.x + Math.cos(a) * d; z = p.z + Math.sin(a) * d;
+          }
         }
         const h = T.heightAt(x, z);
         const w = T.waterAt(x, z);
@@ -677,11 +687,14 @@
       const set = new InstSet(g, mat, 900, 'lotus');
       for (const p of MT.TerrainConst.PONDS) {
         if (p.r < 15) continue;
+        if (p.name === '鱼塘') continue;    // 养鱼塘清塘，不种荷叶
+        const rect = p.shape === 'rect';
         for (let i = 0; i < 240; i++) {
           const a = r.next() * TAU, d = Math.sqrt(r.next()) * p.r * 0.85;
-          const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
+          const x = rect ? p.x + (r.next() * 2 - 1) * p.hw * 0.82 : p.x + Math.cos(a) * d;
+          const z = rect ? p.z + (r.next() * 2 - 1) * p.hd * 0.82 : p.z + Math.sin(a) * d;
           const h = T.heightAt(x, z);
-          if (h > p.y - 0.25) continue;
+          if (h > p.y - 0.25) continue;      // 岸上不长荷叶（方塘靠这一条兜住）
           set.add({ x, y: p.y + 0.03, z }, r.next() * TAU, r.range(0.7, 1.3), 1, r.range(-0.12, 0.2));
         }
       }

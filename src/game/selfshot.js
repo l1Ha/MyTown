@@ -64,6 +64,8 @@
     out.push({ id: 'stall', label: '摊位近景', pos: [-44.4, 1.7, -8.6], look: [-44.5, 1.05, -11.0], fov: 52 });
     // 打谷场：看石磙、草垛、粮堆、拖拉机、板车（从西南侧看，避开村里的房子）
     out.push({ id: 'threshing', label: '打谷场', pos: [-24, 2.9, 95], look: [-7, 0.7, 82], fov: 62 });
+    // 任洼庄台：圆的水塘 + 西北的方形鱼塘（对照卫星图）
+    out.push({ id: 'ponds', label: '任洼庄台 · 水塘', pos: [-104, 34, 92], look: [-140, 1.0, 28], fov: 58 });
     // 院落：从院外上方斜看院内——石磨、水缸、柴火垛、玉米架、晾衣绳
     out.push({ id: 'yard', label: '农家院落', pos: [7.5, 5.2, -2.0], look: [0.0, 0.6, -10.0], fov: 62 });
     add(poiView(this, 'oldwell', '老井', { dist: 7, camH: 2.2, lookH: 1.3, fov: 52 }));

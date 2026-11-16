@@ -27,7 +27,21 @@
     { x: WA_CLUSTER.x, z: WA_CLUSTER.z, r: 24, y: 2.75, name: '任洼水塘' },
     { x: 104, z: 64, r: 17, y: 3.85, name: '藕塘' },
     { x: -186, z: -96, r: 14, y: 3.2, name: '苇塘' },
+    // 任洼庄台西北的方塘（鱼塘）：卫星图上是一口长方形塘，四周有塘埂
+    { x: -162, z: 4, r: 26, hw: 26, hd: 15, y: 3.0, name: '鱼塘', shape: 'rect' },
   ];
+
+  /** 到水面的"形状距离"：圆形塘=圆心距；方塘=到矩形的距离（内部为 0） */
+  function pondDist(x, z, p) {
+    if (p.shape === 'rect') {
+      const dx = Math.abs(x - p.x) - p.hw, dz = Math.abs(z - p.z) - p.hd;
+      if (dx <= 0 && dz <= 0) return 0;
+      return Math.hypot(Math.max(dx, 0), Math.max(dz, 0));
+    }
+    return Math.hypot(x - p.x, z - p.z);
+  }
+  /** 形状的等效半径（用于距离分带） */
+  function pondR(p) { return p.shape === 'rect' ? Math.max(p.hw, p.hd) : p.r; }
 
   let baseNoise = null, detailNoise = null, hillNoise = null;
 
@@ -66,12 +80,22 @@
 
     // 水塘洼地
     for (const p of PONDS) {
-      const d = Math.hypot(x - p.x, z - p.z);
-      if (d < p.r * 1.8) {
-        const t = clamp(d / (p.r * 1.6), 0, 1);
-        const prof = 1 - smoothstep(0.25, 1, t);
-        const bed = p.y - 2.6;
-        h = lerp(h, bed, prof * 0.96);
+      const d = pondDist(x, z, p);
+      if (p.shape === 'rect') {
+        // 方塘是人工挖的鱼塘：塘底平、边坡陡（3 米内从塘底升到水面以上），
+        // 塘形才干脆；照圆塘那套缓坡会挖出一个"千岛湖"式的浅盘
+        if (d < 6) {
+          const prof = 1 - smoothstep(0, 3.2, d);
+          h = lerp(h, p.y - 2.2, prof * 0.98);
+        }
+      } else {
+        const R = pondR(p);
+        if (d < R * 1.8) {
+          const t = clamp(d / (R * 1.6), 0, 1);
+          const prof = 1 - smoothstep(0.25, 1, t);
+          const bed = p.y - 2.6;
+          h = lerp(h, bed, prof * 0.96);
+        }
       }
     }
 
@@ -319,7 +343,10 @@
         return { y: WATER_Y, kind: 'river' };
       }
       for (const p of PONDS) {
-        if (Math.hypot(x - p.x, z - p.z) < p.r * 1.15) return { y: p.y, kind: 'pond', ref: p };
+        const inside = p.shape === 'rect'
+          ? (Math.abs(x - p.x) < p.hw * 1.06 && Math.abs(z - p.z) < p.hd * 1.06)
+          : Math.hypot(x - p.x, z - p.z) < p.r * 1.15;
+        if (inside) return { y: p.y, kind: 'pond', ref: p };
       }
       return null;
     }
@@ -356,8 +383,9 @@
       if (h < WATER_Y + 1.2) mSand = Math.max(mSand, smoothstep(WATER_Y + 1.2, WATER_Y - 3, h));
       // 水塘岸边
       for (const p of PONDS) {
-        const d = Math.hypot(x - p.x, z - p.z);
-        if (d < p.r * 2.4) mSand = Math.max(mSand, 0.8 * (1 - smoothstep(p.r, p.r * 1.9, d)));
+        const R = pondR(p);
+        const d = pondDist(x, z, p);
+        if (d < R * 2.4) mSand = Math.max(mSand, 0.8 * (1 - smoothstep(R, R * 1.9, d)));
       }
       // 陡坡露土
       mSoil = Math.max(mSoil, smoothstep(0.32, 0.75, slope) * 0.75);
@@ -455,15 +483,40 @@
       river.receiveShadow = false;
       out.push({ mesh: river, mat: riverMat, kind: 'river', y: WATER_Y });
 
-      // 水塘
+      // 水塘（圆形 / 方形）
       for (const p of PONDS) {
-        const g = new THREE.CircleGeometry(p.r * 1.25, 48);
-        g.rotateX(-Math.PI / 2);
-        const m = MT.mat.water(0x2e5d63, 0.8);
-        const mesh = new THREE.Mesh(g, m);
-        mesh.position.set(p.x, p.y, p.z);
-        mesh.name = p.name;
-        out.push({ mesh, mat: m, kind: 'pond', y: p.y, ref: p });
+        // 鱼塘水面更深沉一点（养鱼塘常清塘，水色比村口塘暗）
+        const m = MT.mat.water(p.shape === 'rect' ? 0x24494e : 0x2e5d63, p.shape === 'rect' ? 0.72 : 0.8);
+        if (p.shape === 'rect') {
+          // 方塘：矩形水面（比塘底大一点，盖住边坡）+ 四周一圈塘埂
+          const g = new THREE.PlaneGeometry(p.hw * 2 + 4.4, p.hd * 2 + 4.4, 10, 8);
+          g.rotateX(-Math.PI / 2);
+          const mesh = new THREE.Mesh(g, m);
+          mesh.position.set(p.x, p.y, p.z);
+          mesh.name = p.name;
+          out.push({ mesh, mat: m, kind: 'pond', y: p.y, ref: p });
+          // 塘埂：四条土埂压在岸边（比水面高，埂上长草）
+          const bundMat = MT.mat.dirt(3, 1);
+          const bundH = 0.5, bundW = 1.7;
+          const off = 3.4;                       // 埂中心离塘底边界的距离
+          const mkBund = (cx, cz, w, d) => {
+            const b = new THREE.Mesh(new THREE.BoxGeometry(w, bundH, d), bundMat);
+            b.position.set(cx, p.y + 0.1, cz);
+            b.receiveShadow = true; b.castShadow = false;
+            out.push({ mesh: b, mat: bundMat, kind: 'bund', y: p.y + 0.1 });
+          };
+          mkBund(p.x, p.z + p.hd + off, p.hw * 2 + (off + bundW / 2) * 2, bundW);
+          mkBund(p.x, p.z - p.hd - off, p.hw * 2 + (off + bundW / 2) * 2, bundW);
+          mkBund(p.x + p.hw + off, p.z, bundW, p.hd * 2 + off * 2 + bundW);
+          mkBund(p.x - p.hw - off, p.z, bundW, p.hd * 2 + off * 2 + bundW);
+        } else {
+          const g = new THREE.CircleGeometry(p.r * 1.25, 48);
+          g.rotateX(-Math.PI / 2);
+          const mesh = new THREE.Mesh(g, m);
+          mesh.position.set(p.x, p.y, p.z);
+          mesh.name = p.name;
+          out.push({ mesh, mat: m, kind: 'pond', y: p.y, ref: p });
+        }
       }
       return out;
     }
