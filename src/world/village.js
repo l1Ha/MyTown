@@ -93,33 +93,91 @@
       }
 
       /* ============ 2. 民居院落 ============ */
-      const households = [
-        // 村道西侧（院门朝东）
-        { x: 2, z: -8, ry: Math.PI / 2, style: 'brick', outs: ['kitchen', 'pigpen'], hang: true, spring: true },
-        { x: 2, z: 12, ry: Math.PI / 2, style: 'old', outs: ['chicken'], hang: true },
-        { x: 2, z: 32, ry: Math.PI / 2, style: 'brick', outs: ['kitchen', 'chicken', 'pigpen'], spring: true },
-        { x: 2, z: 52, ry: Math.PI / 2, style: 'two', outs: ['kitchen'], awning: true, dish: true },
-        // 村道东侧（院门朝西）
-        { x: 36, z: 0, ry: -Math.PI / 2, style: 'brick', outs: ['kitchen', 'pigpen'], hang: true },
-        { x: 36, z: 20, ry: -Math.PI / 2, style: 'brick', outs: ['barn', 'chicken'], spring: true },
-        { x: 36, z: 42, ry: -Math.PI / 2, style: 'two', outs: ['kitchen'], awning: true, solar: true },
-        // 村内其他
-        { x: 74, z: 6, ry: 0, style: 'brick', outs: ['kitchen', 'pigpen'], hang: true },
-        { x: 74, z: 34, ry: 0, style: 'old', outs: ['chicken'] },
-        { x: 10, z: 84, ry: Math.PI, style: 'brick', outs: ['kitchen', 'barn'] },
-        { x: 76, z: 92, ry: 0, style: 'two', outs: ['kitchen'], awning: true },
+      // 庄台是"挤"出来的：几排院子夹着一两条巷子，户与户之间只留一两米的滴水。
+      // （以前 11 户散在 100 米见方的草地上，俯瞰像别墅小区，不像村子）
+      const rows = [
+        { x: -53, ry: Math.PI / 2, full: false, outs: [], n: 5, z0: 10 },
+        { x: -32, ry: Math.PI / 2, full: false, outs: [], n: 8, z0: -30 },
+        { x: -11, ry: Math.PI / 2, full: false, outs: [], n: 8, z0: -29 },
+        { x: 9, ry: Math.PI / 2, full: true, outs: ['kitchen', 'pigpen'], n: 8, z0: -29 },
+        { x: 29, ry: -Math.PI / 2, full: true, outs: ['kitchen', 'chicken'], n: 8, z0: -29 },
+        { x: 48, ry: -Math.PI / 2, full: false, outs: [], n: 7, z0: -18 },
+        { x: 68, ry: -Math.PI / 2, full: false, outs: [], n: 7, z0: -30 },
+        { x: 88, ry: -Math.PI / 2, full: false, outs: [], n: 3, z0: 43.6 },
+        // 南头再压两排，村子才不是被一刀切平的
+        { x: -32, ry: Math.PI / 2, full: false, outs: [], n: 2, z0: 105.4 },
+        { x: 29, ry: -Math.PI / 2, full: false, outs: [], n: 2, z0: 105.4 },
+        { x: 48, ry: -Math.PI / 2, full: false, outs: [], n: 1, z0: 105.4 },
+        { x: 68, ry: -Math.PI / 2, full: false, outs: [], n: 1, z0: 105.4 },
       ];
+      // 这些地方已经有建筑/设施，排房时让开（半径是设施本身的占地，外加 6m 滴水）
+      const reserved = [
+        { x: -16, z: 12, r: 10 },   // 任家老屋
+        { x: -28, z: 34, r: 8 },    // 土地庙
+        { x: 34, z: 76, r: 15 },    // 任氏宗祠
+        { x: 64, z: 18, r: 11 },    // 碾米房
+        { x: 60, z: 50, r: 8 },     // 水塔
+        { x: 92, z: -4, r: 24 },    // 小学
+        { x: 14, z: 22, r: 6 },     // 老井
+        { x: 6, z: -41, r: 8 },     // 村口大槐树
+        { x: -44, z: -14, r: 13 },  // 集市
+        { x: -10, z: 112, r: 12 },  // 打谷场
+      ];
+      const households = [];
+      for (const row of rows) {
+        for (let i = 0; i < row.n; i++) {
+          // 排是排，但不能像部队营房一样齐：每户沿排向、进深向都抖一点，
+          // 角度也歪一两度，卫星图上屋顶的边线才是"长出来的"
+          const x = row.x + r.range(-0.55, 0.55);
+          const z = row.z0 + i * 15.4 + r.range(-0.6, 0.6);
+          if (reserved.some((q) => Math.hypot(x - q.x, z - q.z) < q.r + 6)) continue;
+          // 卫星图上现在几乎见不到青瓦老房，多是翻新过的平房 + 彩钢瓦
+          const style = row.full
+            ? (r.chance(0.16) ? 'old' : r.pick(['brick', 'brick', 'two']))
+            : (r.chance(0.34) ? 'old' : 'brick');
+          households.push({
+            x, z, ry: row.ry + r.range(-0.03, 0.03),
+            full: row.full, outs: row.outs, style,
+            // 面宽/进深也各家不同：有的三间带偏房，有的只剩两间半
+            w: style === 'two' ? r.range(9.0, 10.2) : r.range(9.3, 11.5),
+            d: style === 'two' ? r.range(7.2, 8.4) : r.range(6.1, 7.3),
+            yardDepth: r.range(6.2, 8.6),
+            spring: r.chance(0.45),
+            hang: r.chance(0.5),
+            awning: r.chance(0.25),
+            dish: row.full && r.chance(0.15),
+          });
+        }
+      }
       for (const h of households) {
         const court = B.courtyard(r, {
-          style: h.style, w: h.style === 'two' ? 9.6 : 10.5, d: h.style === 'two' ? 8 : 6.6,
+          style: h.style, w: h.w, d: h.d, yardDepth: h.yardDepth,
           spring: h.spring, outs: h.outs, awning: h.awning, dish: h.dish, hang: h.hang,
+          yard: h.full ? undefined : false,        // 后排只在卫星图上看得见屋顶与院墙，省掉院内小物件
           wallMat: h.style === 'old' ? MT.M().mud : (r.chance(0.4) ? MT.M().brickGrey : MT.M().brickRed),
           gateSide: r.chance(0.5) ? 1 : -1,
         });
         this.place(court, h.x, h.z, h.ry);
-        this.zone(h.x, h.z, 15);
+        this.zone(h.x, h.z, 9);
+        // 院里的一两棵树（槐、泡桐、柿、桃）——豫南农家院子几乎没有空着的
+        // 后排虽然省掉了院内小物件，但树冠在卫星图上是看得见的，也要种
+        if (r.chance(h.full ? 0.9 : 0.62)) {
+          MT._yardTrees = MT._yardTrees || [];
+          const n = h.full && r.chance(0.5) ? 2 : 1;
+          for (let k = 0; k < n; k++) {
+            const lx = (n === 2 ? (k ? 1 : -1) : (r.chance(0.5) ? 1 : -1)) * (4.6 + r.range(-0.4, 0.4));
+            const lz = 2.4 + r.range(-0.5, 0.5);
+            const cos = Math.cos(h.ry), sin = Math.sin(h.ry);
+            const wx = h.x + lx * cos + lz * sin;
+            const wz = h.z - lx * sin + lz * cos;
+            MT._yardTrees.push({
+              key: r.pick(['locust', 'paulownia', 'persimmon', 'peach']),
+              x: wx, z: wz, s: r.range(0.6, 0.86),
+            });
+          }
+        }
         // 墙头猫
-        if (r.chance(0.4)) {
+        if (h.full && r.chance(0.35)) {
           const cat = P.cat();
           const gx = h.ry === Math.PI / 2 ? h.x + 4 : h.ry === -Math.PI / 2 ? h.x - 4 : h.x;
           const gz = h.ry === 0 || h.ry === Math.PI ? h.z + 4 : h.z;
@@ -345,7 +403,7 @@
       /* ============ 6. 田头 / 自然景点 ============ */
       this.poi('paddy', '秧田 · 插秧', '农田', 40, -110, 10);
       this.poi('wheat', '麦田 · 收麦', '农田', -20, 150, 10);
-      this.poi('threshing', '打谷场 · 晒场', '农田', -8, 82, 10);
+      this.poi('threshing', '打谷场 · 晒场', '农田', -10, 112, 10);
       this.poi('greenhouse', '蔬菜大棚', '农田', 112, 96, 8);
       this.poi('lotus', '藕塘 · 荷花', '物产', 104, 64, 8);
       this.poi('canal', '灌溉水渠', '农田', 100, 150, 6);
@@ -384,6 +442,33 @@
         this.place(lamp, lx, lz, r.next() * TAU);
         this.lampMats.push(lamp.userData.lampMat);
         this.zone(lx, lz, 2);
+      }
+
+      // 村道边的生活痕迹：三轮车、板车、草垛、晒粮、狗窝、水槽。
+      // 街景最缺的就是这些"没用"的东西，少了就像刚交付的安置区。
+      const roadside = [
+        { kind: 'noticeBoard', x: 21.4, z: -2, ry: -Math.PI / 2, text: '村务公开栏' },
+        { kind: 'tricycle', x: 21.2, z: 8, ry: -0.35 },
+        { kind: 'grainSpread', x: 20.9, z: 30, ry: 0, r: 1.5 },
+        { kind: 'dogHouse', x: 20.8, z: 42, ry: -Math.PI / 2 },
+        { kind: 'tricycle', x: 20.6, z: 54, ry: 2.75 },
+        { kind: 'waterTrough', x: 20.4, z: 64, ry: 0 },
+        { kind: 'handCart', x: 20.1, z: 74, ry: 0.45 },
+        { kind: 'haystack', x: 15.0, z: 96, ry: 0, r: 1.15, h: 1.5 },
+        { kind: 'haystack', x: 14.0, z: 118, ry: 0, r: 0.95, h: 1.3 },
+      ];
+      for (const s of roadside) {
+        let obj = null;
+        if (s.kind === 'tricycle') obj = P.tricycle(true);
+        else if (s.kind === 'handCart') obj = P.handCart();
+        else if (s.kind === 'haystack') obj = P.haystack(s.r, s.h);
+        else if (s.kind === 'grainSpread') obj = P.grainSpread(s.r);
+        else if (s.kind === 'dogHouse') obj = P.dogHouse();
+        else if (s.kind === 'waterTrough') obj = P.waterTrough();
+        else if (s.kind === 'noticeBoard') obj = P.noticeBoard(s.text);
+        if (!obj) continue;
+        this.place(obj, s.x, s.z, s.ry);
+        this.zone(s.x, s.z, 1.6);
       }
 
       /* ============ 8. 家禽家畜（散养） ============ */
@@ -452,7 +537,7 @@
       this.npc('锄地的二叔', -24, 148, 'farmer', { lines: 'field' });
       this.npc('插秧的大姐', 40, -108, 'farmer', { lines: 'paddy' });
       this.npc('放牛娃', 26, -92, 'child', { lines: 'buffalo' });
-      this.npc('晒粮的婶子', -8, 78, 'farmer', { lines: 'threshing' });
+      this.npc('晒粮的婶子', -10, 108, 'farmer', { lines: 'threshing' });
       this.npc('赶集的爷爷', -50, -16, 'elder', { lines: 'market' });
       this.npc('玩耍的小孩', 20, 24, 'child', { lines: 'well' });
       this.npc('织布奶奶', -16, 14, 'elder', { lines: 'loom', indoor: true });
@@ -1126,8 +1211,13 @@
         this.group.add(b);
         this.zone(bx, bz, 3);
       }
-      // 菜园（几户人家）
-      const gardens = [[-6, 20], [30, 54], [68, 44], [-100, 22], [10, 52]];
+      // 菜园（几户人家）：塞在房排之间的巷子里，别压到院子、也别留在大片空草地
+      const gardens = [
+        [-21.5, -14], [-21.5, 22], [-21.5, 58],
+        [-1, -14], [-1, 40],
+        [38.5, -14], [38.5, 40],
+        [58, -14], [58, 40],
+      ];
       for (const [gx, gz] of gardens) {
         const gg = this._vegetableGarden(r);
         gg.position.set(gx, T.heightAt(gx, gz), gz);

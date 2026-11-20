@@ -19,6 +19,57 @@
     '小提示：戴上耳机，风声、蝉鸣和水声都是现场合成的。',
   ];
 
+  /**
+   * 自动截图：?shot=1 时进入村庄并按固定机位批量截图，POST 到本地自检服务器。
+   * 用于无头浏览器（Edge --headless）自动化自检，替代手动点按钮。
+   * 参数：ids=sat,street,yard  season=summer  hour=11.5  wait=1500
+   */
+  function autoShot(game) {
+    const q = new URLSearchParams(location.search);
+    if (q.get('shot') !== '1') return;
+    const ids = (q.get('ids') || 'sat,overview,street,yard').split(',').map((s) => s.trim()).filter(Boolean);
+    const season = q.get('season') || 'summer';
+    const hour = parseFloat(q.get('hour') || '11.5');
+    const wait = parseInt(q.get('wait') || '1200', 10);
+
+    const btn = document.getElementById('start-btn');
+    if (btn && !btn.disabled) btn.click();
+    setTimeout(() => {
+      (async () => {
+        try {
+          if (!game.started && game.start) game.start();
+          try { game.setSeason(season); } catch (e) { /* ignore */ }
+          if (game.sky) game.sky.hour = hour;
+          game.paused = false;
+          for (let i = 0; i < 6; i++) {
+            if (game.sky) game.sky.update(0.05);
+            if (game._tick) game._tick();
+          }
+          // 调试探针：?probe=<JS 表达式>，结果 POST 成 _probe.json
+          const probeSrc = q.get('probe');
+          if (probeSrc) {
+            let val = null;
+            try { val = await (0, eval)(probeSrc); } catch (e) { val = { error: (e && e.message) || String(e) }; }
+            try {
+              await fetch('/__shot?name=_probe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(val, null, 2),
+              });
+            } catch (e) { /* ignore */ }
+            console.log('[MyTown] probe', val);
+          }
+          const report = await game.captureAll({ upload: '/__shot', ids, log: true });
+          console.log('[MyTown] 自动截图完成', report.stats, 'errors=' + report.errors);
+          document.title = 'SHOT-DONE errors=' + report.errors;
+        } catch (e) {
+          console.error('[MyTown] 自动截图异常', e);
+          document.title = 'SHOT-ERR ' + ((e && e.message) || e);
+        }
+      })();
+    }, wait);
+  }
+
   function fail(title, detail) {
     const l = document.getElementById('loading');
     if (l) {
@@ -95,6 +146,9 @@
       // 自动载入存档
       try { game.load(); } catch (e) { }
       MT.HUD.setLoadingTip('世界已生成：房舍 ' + (MT.colliders ? MT.colliders.length : 0) + ' 处碰撞体 · 用时 ' + (ms / 1000).toFixed(1) + ' 秒');
+      // 自动截图模式（?shot=1）：无头浏览器/自动化自检用
+      //   ?shot=1&ids=sat,street,yard&season=summer&hour=11.5
+      try { autoShot(game); } catch (e) { console.error('[MyTown] 自动截图失败', e); }
     }).catch((e) => {
       clearInterval(tipTimer);
       fail('生成世界时出错', (e && e.message) || String(e));

@@ -1130,7 +1130,10 @@
   P.powerPole = function (opts = {}) { // 电线杆（含大喇叭）
     const m = M(), g = P.g();
     const h = opts.h || 7.5;
-    const pole = B().cyl(0.11, 0.16, h, m.cement, 10);
+    // 水泥杆：发灰的旧水泥，不是崭新的大白管子
+    const poleMat = m.cement.clone();
+    poleMat.color.setRGB(0.74, 0.74, 0.72);
+    const pole = B().cyl(0.11, 0.16, h, poleMat, 10);
     pole.position.y = h / 2; g.add(pole);
     const cross = B().box(1.4, 0.09, 0.09, m.wood, 0.6);
     cross.position.y = h - 0.45; g.add(cross);

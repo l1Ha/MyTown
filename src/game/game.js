@@ -77,7 +77,7 @@
       this.terrain = new MT.Terrain({ rng: new MT.RNG(20240715), quality: this.quality });
       this.scene.add(this.terrain.group);
       this.player.terrain = this.terrain;
-      this.player.spawnAt(14, 26, 0.12);   // 面向北（-Z），朝村口大槐树
+      this.player.spawnAt(19, 30, 0.12);   // 站在村道正中间（面向北，朝村口大槐树）
 
       await step(0.54, '盖房子（村口与院落）…', 1);
       this.village = new MT.Village(this.scene, this.terrain, {
@@ -165,7 +165,7 @@
       // 玩家碰撞需要地形
       this.player.terrain = this.terrain;
       // 出生点：村道旁
-      this.spawn = new THREE.Vector3(14, 0, 26);
+      this.spawn = new THREE.Vector3(19, 0, 30);
       // 渡口数据
       this.docks = this.village.docks || [];
       this.landingNorth = this.village.landingNorth;

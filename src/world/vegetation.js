@@ -9,6 +9,18 @@
   const THREE = window.THREE;
   const { rad, lerp, clamp, TAU } = MT.util;
 
+  /** 庄台内基本是压实的土（院墙、土巷、晒场），草只零星冒头。
+   *  卫星图上村子是一大片灰褐色，不是草坪；边界用噪声打散，别切成一个方块。 */
+  function villageCore(x, z) {
+    const V = MT.TerrainConst.VILLAGE, W = MT.TerrainConst.WA_CLUSTER;
+    const jx = (Math.sin(x * 0.21) + Math.cos(z * 0.17)) * 3.5;
+    const jz = (Math.cos(x * 0.13) - Math.sin(z * 0.19)) * 3.5;
+    const ev = Math.max(Math.abs(x - V.x + jx) / 62, Math.abs(z - 54 + jz) / 78);
+    if (ev < 1) return true;
+    const ew = Math.max(Math.abs(x - W.x + jx) / 34, Math.abs(z - W.z + jz) / 30);
+    return ew < 1;
+  }
+
   /* ---------------- 风摆（给草 / 芦苇 / 野花 / 庄稼用） ----------------
    * 在顶点着色器里按"高度权重 + 世界位置相位"让植物随风轻摆。 */
   MT._windU = MT._windU || { value: 0 };
@@ -173,6 +185,15 @@
 
       const inWater = (x, z) => T.waterDepth(x, z) > 0.05;
 
+      // 各家院子里的树（village.js 排房时登记）——真实村庄是被树"埋"住的，
+      // 而自动撒树会避开建设区，院里就一棵树都没有
+      if (MT._yardTrees && MT._yardTrees.length) {
+        for (const t of MT._yardTrees) {
+          if (inWater(t.x, t.z)) continue;
+          placements.push(t);
+        }
+      }
+
       /* 1. 行道树 / 防护林带（沿路、沿堤） */
       const line = (pts, key, spacing, jitter, prob) => {
         for (let i = 0; i < pts.length - 1; i++) {
@@ -234,6 +255,7 @@
       /* 2. 村落内外的杂树（榆、槐、泡桐、果树） */
       const villageCenters = [
         { x: MT.TerrainConst.VILLAGE.x, z: MT.TerrainConst.VILLAGE.z, r: 95, n: Math.round(68 * this.q) },
+        { x: MT.TerrainConst.VILLAGE.x, z: 78, r: 72, n: Math.round(48 * this.q) },
         { x: MT.TerrainConst.WA_CLUSTER.x, z: MT.TerrainConst.WA_CLUSTER.z, r: 60, n: Math.round(36 * this.q) },
       ];
       for (const vc of villageCenters) {
@@ -258,6 +280,17 @@
         if (T.slopeAt(x, z) > 0.45) continue;
         const key = r.chance(0.55) ? 'poplar' : (r.chance(0.5) ? 'locust' : 'paulownia');
         placements.push({ key, x, z, s: r.range(0.9, 1.28) });
+      }
+      // 南头树围子：村子往南拉长后，原来一圈只包住了北半截
+      for (let i = 0; i < Math.round(110 * this.q); i++) {
+        const a = r.next() * TAU;
+        const rad2 = 42 + Math.pow(r.next(), 0.7) * 28;
+        const x = MT.TerrainConst.VILLAGE.x + Math.cos(a) * rad2;
+        const z = 82 + Math.sin(a) * rad2;
+        if (inWater(x, z)) continue;
+        if (T.slopeAt(x, z) > 0.45) continue;
+        const key = r.chance(0.5) ? 'poplar' : (r.chance(0.5) ? 'locust' : 'paulownia');
+        placements.push({ key, x, z, s: r.range(0.9, 1.25) });
       }
 
       /* 3. 水边柳树 + 芦苇 */
@@ -571,6 +604,7 @@
         const dW = Math.hypot(x - MT.TerrainConst.WA_CLUSTER.x, z - MT.TerrainConst.WA_CLUSTER.z);
         if (dw < 16 || dW < 12) continue;
         if (MT.inBuildZone(x, z, -1)) continue;
+        if (villageCore(x, z) && r.chance(0.88)) continue;   // 庄台里几乎不长草
         if (T.waterDepth(x, z) > 0.02) continue;
         const s = T.surfaceAt(x, z);
         if (s === 'cement' || s === 'mud') continue;
@@ -611,6 +645,7 @@
         if (s === 'cement' || s === 'mud') continue;
         if (T.slopeAt(x, z) > 0.6) continue;
         if (MT.inBuildZone(x, z, -1)) continue;
+        if (villageCore(x, z) && r.chance(0.82)) continue;   // 地被也稀一些
         set.add({ x, y: T.heightAt(x, z) - 0.03, z }, r.next() * TAU, r.range(0.7, 1.6), 1, 0);
         const it = set.items[set.items.length - 1];
         it.rx = r.range(-0.15, 0.15); it.rz = r.range(-0.15, 0.15);

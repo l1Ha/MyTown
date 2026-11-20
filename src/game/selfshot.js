@@ -50,11 +50,18 @@
       pos: [spawn.x + 78, 62, spawn.z + 96],
       look: [0, 0, 6], fov: 55,
     });
-    // 2. 村口街道（人眼高度）
+    // 1.5 卫星视角：垂直于地面俯瞰，专门用来和真实卫星图逐块对照
+    //     （临时关雾，否则 300m 高度被雾一罩就看不出地物颜色）
+    out.push({
+      id: 'sat', label: '卫星俯瞰',
+      pos: [18, 340, 46.01],
+      look: [18, 0, 46], fov: 40, noFog: true,
+    });
+    // 2. 村口街道（人眼高度，站在村道中间往南看）
     out.push({
       id: 'street', label: '村口街道',
-      pos: [spawn.x + 2, 1.75, spawn.z + 12],
-      look: [-4, 1.6, spawn.z - 36], fov: 66,
+      pos: [spawn.x, 1.75, spawn.z + 14],
+      look: [spawn.x - 2, 1.55, spawn.z - 42], fov: 66,
     });
     // 3~8. 主要地点
     const add = (v) => { if (v) out.push(v); };
@@ -62,12 +69,12 @@
     out.push({ id: 'market', label: '集市摊位', pos: [-40.2, 1.72, -0.8], look: [-45.2, 1.0, -16.5], fov: 62 });
     // 单个摊位正面近景：对着豆腐摊，看清招牌、布棚、桌面货物
     out.push({ id: 'stall', label: '摊位近景', pos: [-44.4, 1.7, -8.6], look: [-44.5, 1.05, -11.0], fov: 52 });
-    // 打谷场：看石磙、草垛、粮堆、拖拉机、板车（从西南侧看，避开村里的房子）
-    out.push({ id: 'threshing', label: '打谷场', pos: [-24, 2.9, 95], look: [-7, 0.7, 82], fov: 62 });
+    // 打谷场：看石磙、草垛、粮堆、拖拉机、板车（场子在村南路口）
+    out.push({ id: 'threshing', label: '打谷场', pos: [-26, 3.0, 125], look: [-9, 0.7, 112], fov: 62 });
     // 任洼庄台：圆的水塘 + 西北的方形鱼塘（对照卫星图）
     out.push({ id: 'ponds', label: '任洼庄台 · 水塘', pos: [-104, 34, 92], look: [-140, 1.0, 28], fov: 58 });
-    // 院落：从院外上方斜看院内——石磨、水缸、柴火垛、玉米架、晾衣绳
-    out.push({ id: 'yard', label: '农家院落', pos: [7.5, 5.2, -2.0], look: [0.0, 0.6, -10.0], fov: 62 });
+    // 院落：从院门外斜看院内——正房、院墙、石磨、水缸、柴火垛、玉米架、晾衣绳
+    out.push({ id: 'yard', label: '农家院落', pos: [23.0, 13.5, -22.0], look: [8.5, 0.2, -13.0], fov: 52 });
     add(poiView(this, 'oldwell', '老井', { dist: 7, camH: 2.2, lookH: 1.3, fov: 52 }));
     add(poiView(this, 'hall', '任氏宗祠', { camH: 4.2, lookH: 3.0, fov: 60 }));
     add(poiView(this, 'school', '村小学', { camH: 4.6, lookH: 3.0, fov: 60 }));
@@ -232,7 +239,12 @@
       // 阴影相机跟随当前机位（否则远处的截图会没有影子）
       try { this.sky.update(0, cam.position, cam); } catch (e) { /* 截图不应因此失败 */ }
 
+      // 卫星俯瞰图关掉雾（否则 300m 高度整片发白，看不出地物颜色）
+      const savedFog = view.noFog ? this.scene.fog : undefined;
+      if (view.noFog) this.scene.fog = null;
+
       this.renderer.render(this.scene, cam);
+      if (view.noFog) this.scene.fog = savedFog || null;
       const url = this.renderer.domElement.toDataURL(opts.type || 'image/jpeg', opts.quality || 0.9);
       return {
         id: view.id, label: view.label, url,

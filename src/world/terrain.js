@@ -43,6 +43,16 @@
   /** 形状的等效半径（用于距离分带） */
   function pondR(p) { return p.shape === 'rect' ? Math.max(p.hw, p.hd) : p.r; }
 
+  /** 圆塘的不规则岸线：低幅多频扰动，卫星图上才不是三个完美圆圈 */
+  function pondEdge(p, a) {
+    if (p.shape === 'rect') return p.r;
+    const ph = p.x * 0.013 + p.z * 0.017;
+    return p.r * (1
+      + 0.065 * Math.sin(a * 3 + ph)
+      + 0.032 * Math.sin(a * 7 - ph * 1.7)
+      + 0.018 * Math.sin(a * 11 + 1.9));
+  }
+
   let baseNoise = null, detailNoise = null, hillNoise = null;
 
   /* =========================================================
@@ -89,9 +99,10 @@
           h = lerp(h, p.y - 2.2, prof * 0.98);
         }
       } else {
-        const R = pondR(p);
-        if (d < R * 1.8) {
-          const t = clamp(d / (R * 1.6), 0, 1);
+        const a = Math.atan2(z - p.z, x - p.x);
+        const R = pondEdge(p, a);
+        if (d < R * 1.9) {
+          const t = clamp(d / (R * 1.65), 0, 1);
           const prof = 1 - smoothstep(0.25, 1, t);
           const bed = p.y - 2.6;
           h = lerp(h, bed, prof * 0.96);
@@ -133,39 +144,53 @@
    * ========================================================= */
   const ROAD_DEFS = [
     {
-      name: '乡道', type: 'cement', w: 6.5, shoulder: 9,
+      name: '乡道', type: 'cement', w: 6.2, shoulder: 2.6,
       pts: [[-480, -40], [-380, -36], [-250, -35], [-140, -33], [-40, -30], [40, -27], [150, -22], [250, -16], [380, -10], [480, -6]],
     },
     {
-      name: '村道', type: 'dirt', w: 4.2, shoulder: 6,
+      // 村道：巷子只有三四米宽，路肩再一宽就成了"机场跑道"（俯瞰最像别墅区的地方）
+      name: '村道', type: 'dirt', w: 3.0, shoulder: 1.3,
       pts: [[18, -30], [19, -8], [20, 14], [18, 44], [16, 84], [12, 140], [8, 210], [6, 320], [4, 420]],
     },
+    // 房排之间的巷子：土路，不是草坪（卫星图上村子内部不该是一片绿）
     {
-      name: '淮河大堤路', type: 'cement', w: 5.6, shoulder: 8,
+      name: '巷', type: 'dirt', w: 2.0, shoulder: 0.8,
+      pts: [[-42.5, 0], [-42.5, 132]],
+    },
+    {
+      name: '巷', type: 'dirt', w: 1.5, shoulder: 0.7,
+      pts: [[-18.9, 0], [-18.9, 132]],
+    },
+    {
+      name: '巷', type: 'dirt', w: 1.5, shoulder: 0.7,
+      pts: [[-3.4, -36], [-3.4, 132]],
+    },
+    {
+      name: '巷', type: 'dirt', w: 2.0, shoulder: 0.8,
+      pts: [[78, -36], [78, 132]],
+    },
+    {
+      name: '淮河大堤路', type: 'cement', w: 5.6, shoulder: 6,
       pts: [[-490, -186], [-380, -186], [-200, -185], [0, -186], [200, -186], [380, -186], [490, -186]],
     },
     {
-      name: '渡口路', type: 'dirt', w: 3.8, shoulder: 5.5,
+      name: '渡口路', type: 'dirt', w: 3.6, shoulder: 2.2,
       pts: [[92, -28], [93, -70], [95, -130], [96, -170], [97, -185], [99, -205], [101, -226]],
     },
     {
-      name: '任洼路', type: 'dirt', w: 3.4, shoulder: 5,
+      name: '任洼路', type: 'dirt', w: 3.2, shoulder: 2.2,
       pts: [[-40, -31], [-70, -16], [-95, 10], [-104, 24], [-92, 40], [-96, 64], [-120, 80], [-172, 92]],
     },
     {
-      name: '南田路', type: 'dirt', w: 3.2, shoulder: 4.6,
+      name: '南田路', type: 'dirt', w: 3.0, shoulder: 2.4,
       pts: [[-470, 172], [-330, 168], [-160, 164], [0, 160], [160, 158], [330, 156], [470, 152]],
     },
     {
-      name: '西田路', type: 'dirt', w: 3.0, shoulder: 4.4,
+      name: '西田路', type: 'dirt', w: 2.8, shoulder: 2.2,
       pts: [[-132, 56], [-132, 110], [-134, 170], [-136, 240], [-136, 300], [-138, 400]],
     },
     {
-      name: '东巷', type: 'dirt', w: 2.8, shoulder: 4,
-      pts: [[50, -28], [50, 0], [50, 40], [52, 82], [54, 130]],
-    },
-    {
-      name: '小学路', type: 'dirt', w: 2.6, shoulder: 3.6,
+      name: '小学路', type: 'dirt', w: 2.4, shoulder: 1.6,
       pts: [[38, -28], [60, -22], [80, -16]],
     },
   ];
@@ -343,9 +368,10 @@
         return { y: WATER_Y, kind: 'river' };
       }
       for (const p of PONDS) {
+        const a = Math.atan2(z - p.z, x - p.x);
         const inside = p.shape === 'rect'
           ? (Math.abs(x - p.x) < p.hw * 1.06 && Math.abs(z - p.z) < p.hd * 1.06)
-          : Math.hypot(x - p.x, z - p.z) < p.r * 1.15;
+          : Math.hypot(x - p.x, z - p.z) < pondEdge(p, a) * 1.04;
         if (inside) return { y: p.y, kind: 'pond', ref: p };
       }
       return null;
@@ -365,17 +391,28 @@
     _vertexColors(x, z, h, slope) {
       // r = 泥土/田, g = 道路, b = 沙/滩涂
       let mSoil = 0, mRoad = 0, mSand = 0;
-      const dV = Math.hypot(x - VILLAGE.x, z - VILLAGE.z);
-      const dW = Math.hypot(x - WA_CLUSTER.x, z - WA_CLUSTER.z);
 
-      // 农田区（村庄以南的大片旱地；丘陵/林地保持草地）
+      // 农田区：土色只作为田垄间的底子，别整片泛黄
       if (z > 34) {
         const patch = smoothstep(0.0, 0.55, baseNoise.fbm(x * 0.012 + 40, z * 0.012 - 20, 3) * 0.5 + 0.5);
-        mSoil = 0.24 + 0.46 * patch;
+        mSoil = 0.10 + 0.30 * patch;
       }
-      // 村内地面多为土
-      if (dV < 96) mSoil = Math.max(mSoil, 0.42 * (1 - smoothstep(60, 96, dV)));
-      if (dW < 60) mSoil = Math.max(mSoil, 0.5 * (1 - smoothstep(34, 60, dW)));
+      // 庄台内部：矩形范围 + 噪声打碎。以前按 110m 半径糊一圈 0.9 的土，
+      // 卫星图上是村子坐在一块大秃斑上——真实的村子是树、屋顶、院墙把地面盖住的。
+      const vEdge = Math.max(Math.abs(x - VILLAGE.x) / 80, Math.abs(z - 46) / 88);
+      const vMask = 1 - smoothstep(0.70, 1.02, vEdge);
+      if (vMask > 0) {
+        // 庄台里面基本是压实的土：院墙、晒场、土巷，绿色只剩边角
+        const patch = 0.5 + 0.5 * baseNoise.fbm(x * 0.09 + 3, z * 0.09 - 5, 2);
+        mSoil = Math.max(mSoil, vMask * (0.68 + 0.30 * patch));
+      }
+      // 任洼队：小一圈的土色，同样打碎
+      const wEdge = Math.max(Math.abs(x - WA_CLUSTER.x) / 38, Math.abs(z - WA_CLUSTER.z) / 34);
+      const wMask = 1 - smoothstep(0.65, 1.0, wEdge);
+      if (wMask > 0) {
+        const patch = 0.5 + 0.5 * baseNoise.fbm(x * 0.11 + 7, z * 0.11 - 3, 2);
+        mSoil = Math.max(mSoil, wMask * (0.48 + 0.36 * patch));
+      }
 
       // 河滩 / 河底（只在靠近水边的滩涂上）
       const riverBand = 1 - smoothstep(RIVER_HALF * 1.02, RIVER_HALF * 1.55, Math.abs(z - RIVER_Z));
@@ -424,7 +461,8 @@
 
       const grassT = MT.texture.cloneTex('grass', 120, 120);
       const soilT = MT.texture.cloneTex('soil', 85, 85);
-      const roadT = MT.texture.cloneTex('cementRoad', 55, 55);
+      // 路肩用土色：水泥路面两边在村里也是土路肩，用水泥贴图会变成一条白边
+      const roadT = MT.texture.cloneTex('dirtRoad', 55, 55);
       const sandT = MT.texture.cloneTex('dirtRoad', 70, 70);
       const mat = new THREE.MeshStandardMaterial({
         map: grassT, vertexColors: true, roughness: 1.0, metalness: 0.0,
@@ -450,15 +488,29 @@
               #ifdef USE_MAP
                 vec4 gT = texture2D( map, vMapUv );
                 vec4 sT = texture2D( uSoilT, vMapUv );
+                sT.rgb *= vec3(1.14, 1.02, 0.82);   // 土色偏暖：村庄的土路是压实的黄土，不是灰泥
                 vec4 rT = texture2D( uRoadT, vMapUv );
                 vec4 dT = texture2D( uSandT, vMapUv );
                 float mSoil = vSplat.r, mRoad = vSplat.g, mSand = vSplat.b;
                 float mGrass = clamp(1.0 - mSoil - mRoad - mSand, 0.0, 1.0);
                 vec4 texelColor = gT * mGrass + sT * mSoil + rT * mRoad + dT * mSand;
+                // 权重会重叠（村里的土路 + 路肩 + 土场），不归一化会叠加成一片死白
+                float wsum = mGrass + mSoil + mRoad + mSand;
+                texelColor /= max(wsum, 0.001);
                 // 大尺度地表变化（按世界坐标），打散贴图的重复感
                 float mac = _vn(vWPos.xz * 0.02) * 0.6 + _vn(vWPos.xz * 0.09) * 0.4;
                 vec3 macTint = mix(vec3(0.92, 1.03, 0.86), vec3(1.07, 1.0, 0.93), mac);
                 texelColor.rgb *= mix(0.86, 1.16, mac) * macTint;
+                // 田块拼布：卫星图上最显眼的是"一格一色"的田地（麦茬偏黄、水稻偏青、翻耕地偏褐），
+                // 用两块不同尺度的方块噪声做出大田的色块，只在草皮权重上叠加
+                float blkA = _vn(floor(vWPos.xz / 24.0) * 0.731 + 3.7);
+                float blkB = _vn(floor(vWPos.xz / 57.0) * 0.413 + 19.1);
+                vec3 fieldA = vec3(0.93, 1.04, 0.84);   // 麦茬 / 玉米地：偏黄绿
+                vec3 fieldB = vec3(0.88, 1.00, 0.90);   // 水稻田：偏青
+                vec3 fieldC = vec3(1.03, 0.98, 0.87);   // 翻耕地 / 油菜茬：偏褐
+                vec3 fieldTint = mix(fieldA, fieldB, blkA);
+                fieldTint = mix(fieldTint, fieldC, smoothstep(0.55, 0.92, blkB) * 0.7);
+                texelColor.rgb *= mix(vec3(1.0), fieldTint, mGrass * 0.52);
                 diffuseColor *= texelColor;
               #endif
             `);
@@ -510,7 +562,16 @@
           mkBund(p.x + p.hw + off, p.z, bundW, p.hd * 2 + off * 2 + bundW);
           mkBund(p.x - p.hw - off, p.z, bundW, p.hd * 2 + off * 2 + bundW);
         } else {
-          const g = new THREE.CircleGeometry(p.r * 1.25, 48);
+          // 不规则岸线：用 Shape 按角度生成一圈顶点，水面才不是一个完美的圆
+          const seg = 64;
+          const shape = new THREE.Shape();
+          for (let i = 0; i <= seg; i++) {
+            const a = (i / seg) * Math.PI * 2;
+            const rr = pondEdge(p, a) * 1.06;
+            const px = Math.cos(a) * rr, py = Math.sin(a) * rr;
+            if (i === 0) shape.moveTo(px, py); else shape.lineTo(px, py);
+          }
+          const g = new THREE.ShapeGeometry(shape);
           g.rotateX(-Math.PI / 2);
           const mesh = new THREE.Mesh(g, m);
           mesh.position.set(p.x, p.y, p.z);
@@ -572,9 +633,9 @@
         geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
         geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
         geo.setIndex(indices);
-        const mat = type === 'cement'
-          ? MT.mat.cement(1, 1)
-          : MT.mat.dirt(1, 1);
+        const base = type === 'cement' ? MT.mat.cement(1, 1) : MT.mat.dirt(1, 1);
+        const mat = base.clone();
+        mat.color = new THREE.Color(type === 'cement' ? 0xb6b0a4 : 0xbfa582);   // 土路是土黄色；水泥路也旧一点，别像新机场跑道
         if (mat.map) { mat.map.repeat.set(1, 1); }
         const mesh = new THREE.Mesh(geo, mat);
         mesh.receiveShadow = true;

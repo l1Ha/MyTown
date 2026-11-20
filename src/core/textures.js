@@ -278,23 +278,42 @@
   const T = {
     /* ---- 红砖墙（豫南乡村最常见的清水砖墙）---- */
     brickRed: () => tex('brickRed', qsize(1024), (ctx, s) => {
-      const base = [[201, 101, 78], [176, 78, 60], [214, 116, 92], [158, 68, 54], [190, 90, 70], [168, 74, 58]];
-      brickPattern(ctx, s, 10, 21, '#cdc3b2', () => {
+      const base = [[174, 92, 72], [152, 74, 58], [186, 104, 84], [136, 64, 52], [164, 84, 66], [146, 70, 56]];
+      brickPattern(ctx, s, 10, 21, '#b9b0a2', () => {
         const c = base[(Math.random() * base.length) | 0];
         const k = 0.86 + Math.random() * 0.28;
         return `rgb(${(c[0] * k) | 0},${(c[1] * k) | 0},${(c[2] * k) | 0})`;
       });
+      // 雨痕：从砖缝往下洇的深色水迹
+      ctx.strokeStyle = 'rgba(48,38,30,0.07)';
+      for (let i = 0; i < 22; i++) {
+        const x = Math.random() * s;
+        ctx.lineWidth = 1 + Math.random() * 4;
+        ctx.beginPath();
+        ctx.moveTo(x, Math.random() * s * 0.2);
+        ctx.lineTo(x + (Math.random() - 0.5) * 10, s * 0.7 + Math.random() * s * 0.3);
+        ctx.stroke();
+      }
       grain(ctx, s, 12);
     }),
 
     /* ---- 青砖墙 ---- */
     brickGrey: () => tex('brickGrey', qsize(1024), (ctx, s) => {
-      const base = [[124, 128, 126], [104, 110, 110], [138, 140, 136], [92, 98, 100], [116, 120, 118], [110, 116, 114]];
-      brickPattern(ctx, s, 10, 21, '#aeaa9e', () => {
+      const base = [[112, 116, 114], [94, 100, 100], [124, 126, 122], [84, 90, 92], [104, 108, 106], [98, 104, 102]];
+      brickPattern(ctx, s, 10, 21, '#9c988e', () => {
         const c = base[(Math.random() * base.length) | 0];
         const k = 0.9 + Math.random() * 0.22;
         return `rgb(${(c[0] * k) | 0},${(c[1] * k) | 0},${(c[2] * k) | 0})`;
       });
+      ctx.strokeStyle = 'rgba(38,40,38,0.07)';
+      for (let i = 0; i < 20; i++) {
+        const x = Math.random() * s;
+        ctx.lineWidth = 1 + Math.random() * 4;
+        ctx.beginPath();
+        ctx.moveTo(x, Math.random() * s * 0.2);
+        ctx.lineTo(x + (Math.random() - 0.5) * 10, s * 0.7 + Math.random() * s * 0.3);
+        ctx.stroke();
+      }
       grain(ctx, s, 10);
     }),
 

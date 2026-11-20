@@ -291,14 +291,15 @@
     const ridge = G.box(slabW * 1.01, 0.2, 0.36, opts.ridgeMat || m.tileDark, 1.6);
     ridge.position.set(0, wallH + rise + 0.07, 0);
     g.add(ridge);
-    // 檐口封边（滴水）
+    // 檐口封边（滴水）：老房子的封檐板是风吹雨淋的深色木头，不是白墙
+    const fasciaMat = opts.fasciaMat || m.woodDark;
     for (const sz of [-1, 1]) {
-      const f = G.box(slabW, 0.16, 0.1, opts.wallMat || m.white, 1.0);
+      const f = G.box(slabW, 0.16, 0.1, fasciaMat, 1.0);
       f.position.set(0, wallH - eave * Math.sin(a) + 0.02, sz * (d / 2 + eave * Math.cos(a)));
       g.add(f);
     }
     // 檐下椽子（从下往上看得到，最能体现"瓦房"）
-    const rafterMat = opts.rafterMat || m.wood;
+    const rafterMat = opts.rafterMat || m.woodDark;
     const nR = Math.max(5, Math.round(slabW / 0.42));
     for (const sz of [-1, 1]) {
       for (let i = 0; i < nR; i++) {
@@ -815,12 +816,12 @@
     // 彩钢瓦：如今豫南一大半平房都换成了红/蓝压型钢板屋顶（卫星图上一眼就能看出来）
     if (opts.roofMat === undefined && opts.style !== 'old') {
       const rv = rng.next();
-      if (rv < 0.44) {
-        opts.roofMat = MT.mat.steelRoof(0xa8322a, 3, 2);      // 大红
+      if (rv < 0.5) {
+        opts.roofMat = MT.mat.steelRoof(0xb03826, 3, 2);      // 大红
         opts.ridgeMat = MT.mat.steelRoof(0x8c2822, 3, 2);
-      } else if (rv < 0.6) {
-        opts.roofMat = MT.mat.steelRoof(0x2f5f86, 3, 2);      // 蓝色
-        opts.ridgeMat = MT.mat.steelRoof(0x26506f, 3, 2);
+      } else if (rv < 0.76) {
+        opts.roofMat = MT.mat.steelRoof(0x33678f, 3, 2);      // 蓝色
+        opts.ridgeMat = MT.mat.steelRoof(0x28536f, 3, 2);
       }
     }
     const house = G.house(opts);
@@ -874,13 +875,17 @@
         root.userData.yardZ = yMax;
       }
     }
-    // 院内地面
-    const floor = G.plane(yardW - 0.6, halfYard * 2 - 0.3, MT.mat.cement(1, 1), (yardW) / 2, halfYard);
+    // 院内地面（水泥院，但用旧一点、发灰的水泥，别白得刺眼）
+    const yardMat = MT.mat.cement(1, 1).clone();
+    yardMat.color = new THREE.Color(0xada595);
+    const floor = G.plane(yardW - 0.6, halfYard * 2 - 0.3, yardMat, (yardW) / 2, halfYard);
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(0, 0.045, (yMin + yMax) / 2);
     root.add(floor);
     // 门前小径
-    const path = G.plane(1.4, 4.0, MT.mat.cement(1, 1), 1, 2);
+    const pathMat = yardMat.clone();
+    pathMat.color = new THREE.Color(0xa39a89);
+    const path = G.plane(1.4, 4.0, pathMat, 1, 2);
     path.rotation.x = -Math.PI / 2;
     path.position.set(root.userData.gateX || 0, 0.05, yMax - 2.2);
     root.add(path);

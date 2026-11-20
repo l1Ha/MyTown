@@ -11,11 +11,11 @@
   const { rad, lerp, clamp, TAU } = MT.util;
 
   const CROPS = {
-    rice: { name: '水稻', tex: 'cropRice', h: [0.75, 1.05], spacing: 0.9, planes: 2, ground: 0x5c6b3a },
-    wheat: { name: '小麦', tex: 'cropWheat', h: [0.85, 1.15], spacing: 0.95, planes: 2, ground: 0x7a7040 },
-    corn: { name: '玉米', tex: 'cropCorn', h: [1.7, 2.2], spacing: 1.7, planes: 2, ground: 0x57603a },
-    rape: { name: '油菜', tex: 'cropRape', h: [0.9, 1.25], spacing: 1.15, planes: 2, ground: 0x6b6a34 },
-    greens: { name: '蔬菜', tex: 'cropGreens', h: [0.35, 0.5], spacing: 0.85, planes: 2, ground: 0x5b4a34 },
+    rice: { name: '水稻', tex: 'cropRice', h: [0.75, 1.05], spacing: 0.9, planes: 2, ground: 0x56643a, canopy: 0x5f8547 },
+    wheat: { name: '小麦', tex: 'cropWheat', h: [0.85, 1.15], spacing: 0.95, planes: 2, ground: 0x746b40, canopy: 0x9f9054 },
+    corn: { name: '玉米', tex: 'cropCorn', h: [1.7, 2.2], spacing: 1.7, planes: 2, ground: 0x525a38, canopy: 0x5d8242 },
+    rape: { name: '油菜', tex: 'cropRape', h: [0.9, 1.25], spacing: 1.15, planes: 2, ground: 0x656434, canopy: 0x9c8f4c },
+    greens: { name: '蔬菜', tex: 'cropGreens', h: [0.35, 0.5], spacing: 0.85, planes: 2, ground: 0x554634, canopy: 0x557a3a },
   };
 
   /** 各作物在四季中的形态：s = 尺寸系数，c = 颜色 */
@@ -74,19 +74,21 @@
       const usable = (x, z, w, d, paddy) => {
         // 采样若干点，检查是否适合种地
         const pts = [[x, z], [x - w / 2, z - d / 2], [x + w / 2, z - d / 2], [x - w / 2, z + d / 2], [x + w / 2, z + d / 2]];
+        // 宅基地区域只看田块中心：卫星图上田是紧贴院墙的，
+        // 用四角去判会把村边整整一圈都判成"村内空地"。
+        if (x > -68 && x < 100 && z > -46 && z < 140) return false;
         for (const [px, pz] of pts) {
           if (T.waterDepth(px, pz) > 0.15) return false;
           if (T.slopeAt(px, pz) > 0.3) return false;
-          const dv = Math.hypot(px - VC.VILLAGE.x, pz - VC.VILLAGE.z);
           const dw = Math.hypot(px - VC.WA_CLUSTER.x, pz - VC.WA_CLUSTER.z);
-          if (dv < 92 || dw < 58) return false;
+          if (dw < 44) return false;
           const road = T.roads.query(px, pz);
           if (road) return false;
           for (const p of VC.PONDS) if (Math.hypot(px - p.x, pz - p.z) < p.r * 1.6) return false;
-          if (MT.inBuildZone(px, pz, 4)) return false;           // 建筑区
-          if (Math.hypot(px + 8, pz - 82) < 22) return false;   // 打谷场
+          if (MT.inBuildZone(px, pz, 0)) return false;           // 建筑区（院落外沿紧贴田埂）
+          if (Math.hypot(px + 10, pz - 112) < 22) return false;   // 打谷场
           if (Math.hypot(px - 104, pz - 64) < 26) return false;  // 藕塘
-          for (const gh of [[112, 96], [128, 112], [-140, 126], [-158, 142], [200, 60]]) if (Math.hypot(px - gh[0], pz - gh[1]) < 16) return false;   // 大棚
+          for (const gh of [[112, 96], [126, 106], [140, 96], [112, 118], [98, 108], [126, 128]]) if (Math.hypot(px - gh[0], pz - gh[1]) < 14) return false;   // 大棚
           for (const wl of [[70, 110], [-80, 180], [180, -40], [-200, 60], [90, 240]]) if (Math.hypot(px - wl[0], pz - wl[1]) < 10) return false;        // 机井
           const h = T.heightAt(px, pz);
           if (!paddy && h < 3.0) return false;
@@ -127,6 +129,16 @@
           addCell(x, z, w, d, 'rice', true, 0);
         }
       }
+      // 村东、村西近处的田块：卫星图上村子四周全是田，不该是大片空草地
+      // （小格、小块：豫南的地多是两三亩一块的条田，贴着村边也是田）
+      for (let gx = -420; gx < 420; gx += 34) {
+        for (let gz = -80; gz < 96; gz += 40) {
+          if (r.chance(0.08)) continue;
+          const w = r.range(20, 30), d = r.range(28, 42);
+          addCell(gx + r.range(0, 6), gz + r.range(0, 8), w, d,
+            r.pick(['wheat', 'wheat', 'corn', 'rape', 'greens']), false, 0);
+        }
+      }
       // 村东、村西的零散田块
       for (let gx = 120; gx < 320; gx += 40) {
         for (let gz = -66; gz < 70; gz += 40) {
@@ -145,6 +157,14 @@
         for (let gz = 100; gz < 260; gz += 46) {
           if (r.chance(0.3)) continue;
           addCell(gx + r.range(0, 6), gz + r.range(0, 8), r.range(22, 30), r.range(26, 36), r.pick(['wheat', 'corn', 'rape', 'greens']), false, 0);
+        }
+      }
+      // 房前屋后的小块菜地/条田：把村子与大片农田之间的空草地填满
+      for (let gx = -92; gx < 112; gx += 18) {
+        for (let gz = -58; gz < 122; gz += 18) {
+          if (r.chance(0.22)) continue;
+          addCell(gx + r.range(0, 5), gz + r.range(0, 5), r.range(9, 15), r.range(9, 14),
+            r.pick(['greens', 'wheat', 'greens', 'rape', 'wheat']), false, 0);
         }
       }
       // 按离村中心距离排序，保证近处田块优先长庄稼
@@ -224,7 +244,22 @@
       const ridgeArr = { pos: [], uv: [], nor: [], idx: [], col: [] };
       const waterArr = { pos: [], uv: [], nor: [], idx: [] };
       let vBase = 0, rBase = 0, wBase = 0;
-      const soilT = MT.texture.cloneTex('soil', 1, 1);
+      // 田面用"草"的贴图而不是"土"的贴图：卫星图上田里是庄稼的冠层，
+      // 用深褐色的土壤贴图，整片村子四周看着像刚翻过的裸地。
+      const fieldT = MT.texture.cloneTex('grass', 1, 1);
+      const GRASS_BASE = new THREE.Color(0x5a763a);
+      const plotTints = {};
+      const tintOf = (crop) => {
+        if (plotTints[crop]) return plotTints[crop];
+        const canopy = new THREE.Color((CROPS[crop] || CROPS.wheat).canopy);
+        const t = new THREE.Color(
+          Math.min(2.4, canopy.r / GRASS_BASE.r),
+          Math.min(2.4, canopy.g / GRASS_BASE.g),
+          Math.min(2.4, canopy.b / GRASS_BASE.b),
+        );
+        plotTints[crop] = t;
+        return t;
+      };
       const ridgeT = MT.texture.cloneTex('dirtRoad', 1, 1);
       const waterMat = MT.mat.water(0x3f6360, 0.7);
       // 秧田水：不要像一块反光塑料板，压暗、减弱天光反射
@@ -239,6 +274,10 @@
         const x0 = p.x - p.w / 2, x1 = p.x + p.w / 2;
         const z0 = p.z - p.d / 2, z1 = p.z + p.d / 2;
         const lift = p.paddy ? 0.02 : 0.05;
+        // 每块田一点明暗差异，避免整片田一个色（卫星图上相邻地块深浅不同）
+        const pv = 0.90 + (Math.abs(Math.sin(p.x * 12.9898 + p.z * 78.233) * 43758.5453) % 1) * 0.20;
+        const tint = tintOf(p.crop);
+        const cr = tint.r * pv, cg = tint.g * pv, cb = tint.b * pv;
         // 地面（细分网格，贴合地形）
         const segX = Math.max(2, Math.round(p.w / 8)), segZ = Math.max(2, Math.round(p.d / 8));
         const base = vBase;
@@ -248,8 +287,7 @@
             posArr.push(x, sampleY(x, z) + lift, z);
             norArr.push(0, 1, 0);
             uvArr.push((x - x0) / 6, (z - z0) / 6);
-            const c = CROPS[p.crop];
-            colArr.push(0xffffff === 0xffffff ? 1 : 1, 1, 1);
+            colArr.push(cr, cg, cb);
           }
         }
         for (let j = 0; j < segZ; j++) {
@@ -327,7 +365,7 @@
         return mesh;
       };
       const fieldMat = new THREE.MeshStandardMaterial({
-        map: soilT, vertexColors: true, roughness: 1.0,
+        map: fieldT, vertexColors: true, roughness: 1.0,
       });
       this.fieldMat = fieldMat;
       const fields = mkMesh({ pos: posArr, uv: uvArr, nor: norArr, idx: idxArr, col: colArr }, fieldMat, '田块');
@@ -348,14 +386,17 @@
     /* ---------------- 打谷场（晒场） ---------------- */
     _buildThreshingFloor() {
       const T = this.terrain, r = this.rng;
-      const x = -8, z = 82;
+      const x = -10, z = 112;   // 打谷场放在村南边、下地必经的路口（原来压在村子中间，占了大片宅基地）
       const gy = T.heightAt(x, z);
       const g = new THREE.Group();
       g.position.set(x, gy, z);
-      const R = 15;
-      MT.addBuildZone(x, z, R - 0.5);   // 水泥场里不许长草（草/地被/野花都会避开建设区）
-      // 水泥场
-      const circle = new THREE.Mesh(new THREE.CircleGeometry(R, 40), MT.mat.cement(4, 4));
+      const R = 10.5;
+      MT.addBuildZone(x, z, R - 0.5);   // 晒场里不许长草（草/地被/野花都会避开建设区）
+      // 晒场：夯实的黄土（不是水泥空地，卫星图上是压实的土场）。
+      // 集市地面贴图偏亮，压暗一点才像常年被石磙碾过的土场。
+      const floorMat = MT.mat.marketGround(4, 4).clone();
+      floorMat.color.setRGB(0.66, 0.62, 0.54);
+      const circle = new THREE.Mesh(new THREE.CircleGeometry(R, 30), floorMat);
       circle.rotation.x = -Math.PI / 2; circle.position.y = 0.06; circle.receiveShadow = true;
       g.add(circle);
       const ring = new THREE.Mesh(new THREE.RingGeometry(R, R + 0.8, 40), MT.mat.soil(3, 3));
@@ -621,10 +662,10 @@
           return col;
         }, () => rule.s);
       }
-      // 田块地面颜色（土壤贴图本身偏暗，这里用较亮的"染色"相乘）
+      // 田块地面颜色：顶点色已是作物冠层色，这里只做轻微的季节亮度/色调
       if (this.fieldMat) {
         const gc = {
-          spring: 0xc4cc9a, summer: 0xbcc894, autumn: 0xd8c88e, winter: 0xd6d2c0,
+          spring: 0xeef2e0, summer: 0xffffff, autumn: 0xf8ecd8, winter: 0xd9d8cc,
         }[key];
         const c = new THREE.Color(gc);
         this.fieldMat.color.copy(c);
