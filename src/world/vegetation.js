@@ -218,7 +218,15 @@
       line([[-480, -52], [480, -16]], () => 'poplar', 8, 2.2, 0.9);
       line([[-480, -36], [480, 0]], () => 'poplar', 8, 2.2, 0.9);
       // 村道
-      line([[18, -30], [4, 420]], () => (r.chance(0.5) ? 'poplar' : 'locust'), 15, 3.0, 0.6);
+      line([[14, -170], [4, 420]], () => (r.chance(0.5) ? 'poplar' : 'locust'), 15, 3.0, 0.6);
+      // 田间路（新加的方格路网，两侧镶树）
+      line([[-470, 244], [470, 236]], () => 'poplar', 16, 3.2, 0.5);
+      line([[150, -170], [144, 400]], () => (r.chance(0.7) ? 'poplar' : 'locust'), 16, 3.2, 0.5);
+      // 村里巷子口：树冠从墙头探出来，庄台才不像新盖的安置区
+      line([[-42.5, 0], [-42.5, 132]], () => (r.chance(0.5) ? 'locust' : 'paulownia'), 14, 3.4, 0.4);
+      line([[-18.9, 0], [-18.9, 132]], () => (r.chance(0.5) ? 'locust' : 'poplar'), 14, 3.4, 0.38);
+      line([[-3.4, -36], [-3.4, 132]], () => 'paulownia', 14, 3.4, 0.38);
+      line([[78, -36], [78, 132]], () => (r.chance(0.5) ? 'locust' : 'poplar'), 14, 3.4, 0.38);
       // 田间路
       line([[-470, 172], [470, 152]], (x, z) => (r.chance(0.6) ? 'poplar' : 'willow'), 17, 3.5, 0.55);
       // 渡口路（柳树多）
@@ -228,34 +236,52 @@
        * 卫星图上最显眼的就是"田成方、路成网、树成行"——大田四周多半有一行树 */
       const farmPlots = MT.farmPlots || [];
       for (const p of farmPlots) {
-        if (r.chance(0.45)) continue;                  // 只给一部分田镶边
+        if (r.chance(0.22)) continue;                  // 大多数田都有树行子
         const alongX = p.w >= p.d;                     // 沿长边种
-        const side = r.chance(0.5) ? 1 : -1;
-        if (alongX) {
-          const z = p.z + side * (p.d / 2 + 1.3);
-          const n = Math.max(1, Math.floor(p.w / 10));
-          for (let k = 0; k <= n; k++) {
-            const x = p.x - p.w / 2 + (k + 0.5) * (p.w / (n + 1));
-            if (inWater(x, z)) continue;
-            if (T.slopeAt(x, z) > 0.4) continue;
-            placements.push({ key: 'poplar', x, z, s: r.range(0.78, 1.02) });
+        const sides = r.chance(0.5) ? [1, -1] : [r.chance(0.5) ? 1 : -1];
+        for (const side of sides) {
+          if (alongX) {
+            const z = p.z + side * (p.d / 2 + 1.3);
+            const n = Math.max(1, Math.floor(p.w / 9));
+            for (let k = 0; k <= n; k++) {
+              const x = p.x - p.w / 2 + (k + 0.5) * (p.w / (n + 1));
+              if (inWater(x, z)) continue;
+              if (T.slopeAt(x, z) > 0.4) continue;
+              placements.push({ key: 'poplar', x, z, s: r.range(0.88, 1.14) });
+            }
+          } else {
+            const x = p.x + side * (p.w / 2 + 1.3);
+            const n = Math.max(1, Math.floor(p.d / 9));
+            for (let k = 0; k <= n; k++) {
+              const z = p.z - p.d / 2 + (k + 0.5) * (p.d / (n + 1));
+              if (inWater(x, z)) continue;
+              if (T.slopeAt(x, z) > 0.4) continue;
+              placements.push({ key: 'poplar', x, z, s: r.range(0.88, 1.14) });
+            }
           }
-        } else {
-          const x = p.x + side * (p.w / 2 + 1.3);
-          const n = Math.max(1, Math.floor(p.d / 10));
-          for (let k = 0; k <= n; k++) {
-            const z = p.z - p.d / 2 + (k + 0.5) * (p.d / (n + 1));
+        }
+      }
+
+      /* 1.6 用材林 / 苗圃：成行成垄的深绿方块，卫星图上一眼就能认出来 */
+      for (const b of (MT.TerrainConst.PLANTATIONS || [])) {
+        const rows = Math.max(2, Math.floor(b.d / 7));
+        const cols = Math.max(2, Math.floor(b.w / 7));
+        for (let i = 0; i < rows; i++) {
+          for (let j = 0; j < cols; j++) {
+            const x = b.x - b.w / 2 + (j + 0.5) * (b.w / cols) + r.range(-1.4, 1.4);
+            const z = b.z - b.d / 2 + (i + 0.5) * (b.d / rows) + r.range(-1.4, 1.4);
             if (inWater(x, z)) continue;
-            if (T.slopeAt(x, z) > 0.4) continue;
-            placements.push({ key: 'poplar', x, z, s: r.range(0.78, 1.02) });
+            if (T.slopeAt(x, z) > 0.45) continue;
+            placements.push({ key: r.chance(0.86) ? 'poplar' : 'locust', x, z, s: r.range(0.9, 1.15) });
           }
         }
       }
 
       /* 2. 村落内外的杂树（榆、槐、泡桐、果树） */
       const villageCenters = [
-        { x: MT.TerrainConst.VILLAGE.x, z: MT.TerrainConst.VILLAGE.z, r: 95, n: Math.round(68 * this.q) },
-        { x: MT.TerrainConst.VILLAGE.x, z: 78, r: 72, n: Math.round(48 * this.q) },
+        { x: MT.TerrainConst.VILLAGE.x, z: MT.TerrainConst.VILLAGE.z, r: 95, n: Math.round(88 * this.q) },
+        { x: MT.TerrainConst.VILLAGE.x, z: 78, r: 72, n: Math.round(62 * this.q) },
+        { x: MT.TerrainConst.VILLAGE.x, z: 146, r: 46, n: Math.round(30 * this.q) },
         { x: MT.TerrainConst.WA_CLUSTER.x, z: MT.TerrainConst.WA_CLUSTER.z, r: 60, n: Math.round(36 * this.q) },
       ];
       for (const vc of villageCenters) {
@@ -374,7 +400,8 @@
         return false;
       };
       for (const p of placements) {
-        if (MT.inBuildZone(p.x, p.z, 1.5)) continue;
+        // 院里登记的树（p.yard）就长在宅基地里，不能再被建设区挡掉
+        if (!p.yard && MT.inBuildZone(p.x, p.z, 1.5)) continue;
         if (inField(p.x, p.z)) continue;
         (byKey[p.key] = byKey[p.key] || []).push(p);
       }
@@ -596,6 +623,14 @@
       MT.windMaterial(mat, 0.07);
       const N = Math.round((this.quality === 'low' ? 5000 : this.quality === 'medium' ? 12000 : 22000));
       const set = new InstSet(geo, mat, N, 'grass');
+      const plots = MT.farmPlots || [];
+      const inField = (x, z) => {
+        for (let i = 0; i < plots.length; i++) {
+          const p = plots[i];
+          if (Math.abs(x - p.x) < p.w / 2 + 0.4 && Math.abs(z - p.z) < p.d / 2 + 0.4) return true;
+        }
+        return false;
+      };
       let tries = 0;
       while (set.items.length < N && tries < N * 8) {
         tries++;
@@ -604,6 +639,7 @@
         const dW = Math.hypot(x - MT.TerrainConst.WA_CLUSTER.x, z - MT.TerrainConst.WA_CLUSTER.z);
         if (dw < 16 || dW < 12) continue;
         if (MT.inBuildZone(x, z, -1)) continue;
+        if (inField(x, z)) continue;                          // 田里长的是庄稼，不是杂草
         if (villageCore(x, z) && r.chance(0.88)) continue;   // 庄台里几乎不长草
         if (T.waterDepth(x, z) > 0.02) continue;
         const s = T.surfaceAt(x, z);
@@ -636,6 +672,14 @@
       });
       MT.windMaterial(mat, 0.04);
       const set = new InstSet(geo, mat, N, 'cover');
+      const plots = MT.farmPlots || [];
+      const inField = (x, z) => {
+        for (let i = 0; i < plots.length; i++) {
+          const p = plots[i];
+          if (Math.abs(x - p.x) < p.w / 2 + 0.4 && Math.abs(z - p.z) < p.d / 2 + 0.4) return true;
+        }
+        return false;
+      };
       let tries = 0;
       while (set.items.length < N && tries < N * 6) {
         tries++;
@@ -645,6 +689,7 @@
         if (s === 'cement' || s === 'mud') continue;
         if (T.slopeAt(x, z) > 0.6) continue;
         if (MT.inBuildZone(x, z, -1)) continue;
+        if (inField(x, z)) continue;
         if (villageCore(x, z) && r.chance(0.82)) continue;   // 地被也稀一些
         set.add({ x, y: T.heightAt(x, z) - 0.03, z }, r.next() * TAU, r.range(0.7, 1.6), 1, 0);
         const it = set.items[set.items.length - 1];
@@ -1008,12 +1053,12 @@
         }
       }
       if (this.grassSet) {
-        const gc = { spring: 0xa8c46a, summer: 0x8fb454, autumn: 0xc0a858, winter: 0x9a8f70 }[key] || 0x8fb454;
+        const gc = { spring: 0x9cb45e, summer: 0x7c9e48, autumn: 0xb09e50, winter: 0x94896e }[key] || 0x7c9e48;
         const cc = new THREE.Color(gc);
         this.grassSet.applySeason((it, col) => col.copy(cc).multiplyScalar(0.82 + ((it.ry * 31) % 1) * 0.34), (it) => (bare ? 0.55 : 1));
       }
       if (this.coverSet) {
-        const gc2 = { spring: 0xaac86e, summer: 0x8fbb58, autumn: 0xc6ae5c, winter: 0xa2987c }[key] || 0x8fbb58;
+        const gc2 = { spring: 0x9cbc62, summer: 0x7da44c, autumn: 0xb8a258, winter: 0x9c9278 }[key] || 0x7da44c;
         const cc2 = new THREE.Color(gc2);
         this.coverSet.applySeason((it, col) => col.copy(cc2).multiplyScalar(0.8 + ((it.ry * 41) % 1) * 0.4), (it) => (bare ? 0.7 : 1));
       }

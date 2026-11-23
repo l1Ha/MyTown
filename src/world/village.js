@@ -161,9 +161,9 @@
         this.zone(h.x, h.z, 9);
         // 院里的一两棵树（槐、泡桐、柿、桃）——豫南农家院子几乎没有空着的
         // 后排虽然省掉了院内小物件，但树冠在卫星图上是看得见的，也要种
-        if (r.chance(h.full ? 0.9 : 0.62)) {
+        if (r.chance(h.full ? 0.96 : 0.78)) {
           MT._yardTrees = MT._yardTrees || [];
-          const n = h.full && r.chance(0.5) ? 2 : 1;
+          const n = h.full ? (r.chance(0.55) ? 2 : 1) : (r.chance(0.25) ? 2 : 1);
           for (let k = 0; k < n; k++) {
             const lx = (n === 2 ? (k ? 1 : -1) : (r.chance(0.5) ? 1 : -1)) * (4.6 + r.range(-0.4, 0.4));
             const lz = 2.4 + r.range(-0.5, 0.5);
@@ -171,8 +171,8 @@
             const wx = h.x + lx * cos + lz * sin;
             const wz = h.z - lx * sin + lz * cos;
             MT._yardTrees.push({
-              key: r.pick(['locust', 'paulownia', 'persimmon', 'peach']),
-              x: wx, z: wz, s: r.range(0.6, 0.86),
+              key: r.pick(['locust', 'paulownia', 'poplar', 'persimmon', 'peach']),
+              x: wx, z: wz, s: r.range(0.78, 1.05), yard: true,
             });
           }
         }
@@ -186,6 +186,27 @@
           cat.rotation.y = h.ry + Math.PI / 2;
           this.group.add(cat);
         }
+      }
+
+      /* ============ 2.5 沿路散户 ============ */
+      // 卫星图上村子南北两头还牵着几户人家，沿着村道一溜排开，不是一刀切平的边界
+      const outliers = [
+        { x: 32, z: -64, ry: -Math.PI / 2, roof: 0x33678f },
+        { x: 26, z: -104, ry: -Math.PI / 2, roof: 0xb03826 },
+        { x: 22, z: 152, ry: -Math.PI / 2, roof: 0xb03826 },
+        { x: 20, z: 178, ry: -Math.PI / 2, roof: 0x33678f },
+      ];
+      for (const o of outliers) {
+        const court = B.courtyard(r, {
+          style: 'brick', w: r.range(9.4, 10.6), d: r.range(6.2, 7.0),
+          roofMat: MT.mat.steelRoof(o.roof, 3, 2),
+          ridgeMat: MT.mat.steelRoof(o.roof === 0x33678f ? 0x28536f : 0x8c2822, 3, 2),
+          outs: [], yard: false, yardDepth: r.range(6.0, 7.6),
+          wallMat: MT.M().brickRed,
+          gateSide: r.chance(0.5) ? 1 : -1,
+        });
+        this.place(court, o.x, o.z, o.ry);
+        this.zone(o.x, o.z, 9);
       }
 
       /* ============ 3. 任洼队（老土坯房 + 水塘） ============ */

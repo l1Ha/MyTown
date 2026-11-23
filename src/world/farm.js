@@ -11,11 +11,11 @@
   const { rad, lerp, clamp, TAU } = MT.util;
 
   const CROPS = {
-    rice: { name: '水稻', tex: 'cropRice', h: [0.75, 1.05], spacing: 0.9, planes: 2, ground: 0x56643a, canopy: 0x5f8547 },
-    wheat: { name: '小麦', tex: 'cropWheat', h: [0.85, 1.15], spacing: 0.95, planes: 2, ground: 0x746b40, canopy: 0x9f9054 },
-    corn: { name: '玉米', tex: 'cropCorn', h: [1.7, 2.2], spacing: 1.7, planes: 2, ground: 0x525a38, canopy: 0x5d8242 },
-    rape: { name: '油菜', tex: 'cropRape', h: [0.9, 1.25], spacing: 1.15, planes: 2, ground: 0x656434, canopy: 0x9c8f4c },
-    greens: { name: '蔬菜', tex: 'cropGreens', h: [0.35, 0.5], spacing: 0.85, planes: 2, ground: 0x554634, canopy: 0x557a3a },
+    rice: { name: '水稻', tex: 'cropRice', h: [0.75, 1.05], spacing: 0.9, planes: 2, ground: 0x3f5230, canopy: 0x46753a },
+    wheat: { name: '小麦', tex: 'cropWheat', h: [0.85, 1.15], spacing: 0.95, planes: 2, ground: 0x555234, canopy: 0x6f6a3c },
+    corn: { name: '玉米', tex: 'cropCorn', h: [1.7, 2.2], spacing: 1.7, planes: 2, ground: 0x3f4a2e, canopy: 0x4a7438 },
+    rape: { name: '油菜', tex: 'cropRape', h: [0.9, 1.25], spacing: 1.15, planes: 2, ground: 0x4c4a2c, canopy: 0x6e6838 },
+    greens: { name: '蔬菜', tex: 'cropGreens', h: [0.35, 0.5], spacing: 0.85, planes: 2, ground: 0x443a2c, canopy: 0x4a6f36 },
   };
 
   /** 各作物在四季中的形态：s = 尺寸系数，c = 颜色 */
@@ -54,7 +54,8 @@
       scene.add(this.group);
       this.plots = [];
       this.cropSets = {};
-      this.instanceBudget = opts.quality === 'low' ? 5200 : opts.quality === 'medium' ? 9000 : 14000;
+      // 大田块时代：预算按面积铺（稀疏化由填充逻辑统一处理），画质优先可给足
+      this.instanceBudget = opts.quality === 'low' ? 9000 : opts.quality === 'medium' ? 22000 : 42000;
       this._layoutPlots();
       MT.farmPlots = this.plots;     // 供植被系统避让（不在田里长树）
       this._buildCropSets();
@@ -72,29 +73,35 @@
       const r = this.rng, T = this.terrain;
       const VC = MT.TerrainConst;
       const usable = (x, z, w, d, paddy) => {
-        // 采样若干点，检查是否适合种地
+        // 四角 + 中心
         const pts = [[x, z], [x - w / 2, z - d / 2], [x + w / 2, z - d / 2], [x - w / 2, z + d / 2], [x + w / 2, z + d / 2]];
-        // 宅基地区域只看田块中心：卫星图上田是紧贴院墙的，
-        // 用四角去判会把村边整整一圈都判成"村内空地"。
-        if (x > -68 && x < 100 && z > -46 && z < 140) return false;
+        // 宅基地区域：中心或四角落进村域都不种（大田块必须整块避开村子，
+        // 否则田面会从院子底下穿出来）。村域比实际院落略小，田才贴得近。
         for (const [px, pz] of pts) {
+          if (px > -58 && px < 94 && pz > -38 && pz < 130) return false;
           if (T.waterDepth(px, pz) > 0.15) return false;
-          if (T.slopeAt(px, pz) > 0.3) return false;
-          const dw = Math.hypot(px - VC.WA_CLUSTER.x, pz - VC.WA_CLUSTER.z);
-          if (dw < 44) return false;
-          const road = T.roads.query(px, pz);
-          if (road) return false;
-          for (const p of VC.PONDS) if (Math.hypot(px - p.x, pz - p.z) < p.r * 1.6) return false;
-          if (MT.inBuildZone(px, pz, 0)) return false;           // 建筑区（院落外沿紧贴田埂）
-          if (Math.hypot(px + 10, pz - 112) < 22) return false;   // 打谷场
-          if (Math.hypot(px - 104, pz - 64) < 26) return false;  // 藕塘
-          for (const gh of [[112, 96], [126, 106], [140, 96], [112, 118], [98, 108], [126, 128]]) if (Math.hypot(px - gh[0], pz - gh[1]) < 14) return false;   // 大棚
-          for (const wl of [[70, 110], [-80, 180], [180, -40], [-200, 60], [90, 240]]) if (Math.hypot(px - wl[0], pz - wl[1]) < 10) return false;        // 机井
-          const h = T.heightAt(px, pz);
-          if (!paddy && h < 3.0) return false;
-          if (paddy && (h < 2.2 || h > 8.5)) return false;
-          if (h > 26) return false;
         }
+        // 其余条件只看田块中心：大田块允许压过田埂和小路（路网画在田面之上）
+        if (T.slopeAt(x, z) > 0.38) return false;
+        const dw = Math.hypot(x - VC.WA_CLUSTER.x, z - VC.WA_CLUSTER.z);
+        if (dw < 44) return false;
+        for (const p of VC.PONDS) {
+          const pr = p.r || Math.max(p.hw || 0, p.hd || 0);
+          if (Math.hypot(x - p.x, z - p.z) < pr * 1.35) return false;
+        }
+        // 用材林 / 苗圃里不种庄稼
+        for (const b of (VC.PLANTATIONS || [])) {
+          if (Math.abs(x - b.x) < b.w / 2 + 4 && Math.abs(z - b.z) < b.d / 2 + 4) return false;
+        }
+        if (MT.inBuildZone(x, z, 2)) return false;             // 建筑区（院落外沿紧贴田埂）
+        if (Math.hypot(x + 10, z - 112) < 20) return false;      // 打谷场
+        if (Math.hypot(x - 104, z - 64) < 24) return false;      // 藕塘
+        for (const gh of [[112, 96], [126, 106], [140, 96], [112, 118], [98, 108], [126, 128]]) if (Math.hypot(x - gh[0], z - gh[1]) < 14) return false;   // 大棚
+        for (const wl of [[70, 110], [-80, 180], [180, -40], [-200, 60], [90, 240]]) if (Math.hypot(x - wl[0], z - wl[1]) < 10) return false;        // 机井
+        const h = T.heightAt(x, z);
+        if (h < 2.6) return false;
+        if (paddy && h > 8.5) return false;
+        if (h > 26) return false;
         return true;
       };
 
@@ -110,61 +117,39 @@
         this.plots.push({ x, z, w, d, crop, paddy: !!paddy, r: seedRot || 0 });
       };
 
-      // 南边大片旱地（麦、油菜、玉米、菜）
-      for (let gx = -450; gx < 450; gx += 38) {
-        for (let gz = 88; gz < 450; gz += 46) {
-          if (r.chance(0.22)) continue;
-          const w = r.range(24, 32), d = r.range(28, 40);
-          const x = gx + r.range(0, 8), z = gz + r.range(0, 10);
-          let crop = r.pick(['wheat', 'wheat', 'rape', 'corn', 'wheat', 'greens', 'rape']);
-          addCell(x, z, w, d, crop, false, 0);
+      // 南边大片水旱田：大方格，像卫星图上的格子田
+      // （田块几乎顶满格子，中间只留一条田间路的缝——卫星图上田和田之间没有宽草带）
+      for (let gx = -450; gx < 450; gx += 78) {
+        for (let gz = 86; gz < 450; gz += 92) {
+          if (r.chance(0.06)) continue;
+          const w = r.range(64, 72), d = r.range(80, 87);
+          const crop = r.pick(['rice', 'rice', 'rice', 'corn', 'wheat', 'greens']);
+          addCell(gx + r.range(0, 6), gz + r.range(0, 5), w, d, crop, crop === 'rice', 0);
         }
       }
       // 淮河边上的水稻田（圩区）
-      for (let gx = -440; gx < 440; gx += 34) {
-        for (let gz = -170; gz < -74; gz += 30) {
-          if (r.chance(0.18)) continue;
-          const w = r.range(22, 30), d = r.range(20, 28);
-          const x = gx + r.range(0, 7), z = gz + r.range(0, 7);
-          addCell(x, z, w, d, 'rice', true, 0);
+      for (let gx = -440; gx < 440; gx += 72) {
+        for (let gz = -172; gz < -72; gz += 66) {
+          if (r.chance(0.05)) continue;
+          const w = r.range(60, 66), d = r.range(54, 60);
+          addCell(gx + r.range(0, 6), gz + r.range(0, 5), w, d, 'rice', true, 0);
         }
       }
       // 村东、村西近处的田块：卫星图上村子四周全是田，不该是大片空草地
-      // （小格、小块：豫南的地多是两三亩一块的条田，贴着村边也是田）
-      for (let gx = -420; gx < 420; gx += 34) {
-        for (let gz = -80; gz < 96; gz += 40) {
-          if (r.chance(0.08)) continue;
-          const w = r.range(20, 30), d = r.range(28, 42);
-          addCell(gx + r.range(0, 6), gz + r.range(0, 8), w, d,
-            r.pick(['wheat', 'wheat', 'corn', 'rape', 'greens']), false, 0);
+      for (let gx = -420; gx < 420; gx += 68) {
+        for (let gz = -76; gz < 96; gz += 74) {
+          if (r.chance(0.03)) continue;
+          const w = r.range(58, 63), d = r.range(62, 69);
+          const crop = r.pick(['rice', 'rice', 'corn', 'corn', 'wheat', 'greens']);
+          addCell(gx + r.range(0, 5), gz + r.range(0, 5), w, d, crop, crop === 'rice', 0);
         }
       }
-      // 村东、村西的零散田块
-      for (let gx = 120; gx < 320; gx += 40) {
-        for (let gz = -66; gz < 70; gz += 40) {
-          if (r.chance(0.3)) continue;
-          addCell(gx + r.range(0, 6), gz + r.range(0, 6), r.range(22, 28), r.range(24, 32), r.pick(['wheat', 'corn', 'greens']), false, 0);
-        }
-      }
-      for (let gx = -320; gx < -170; gx += 40) {
-        for (let gz = -60; gz < 90; gz += 40) {
-          if (r.chance(0.35)) continue;
-          addCell(gx + r.range(0, 6), gz + r.range(0, 6), r.range(22, 28), r.range(24, 32), r.pick(['wheat', 'rape', 'corn']), false, 0);
-        }
-      }
-      // 任洼南边
-      for (let gx = -300; gx < -60; gx += 42) {
-        for (let gz = 100; gz < 260; gz += 46) {
-          if (r.chance(0.3)) continue;
-          addCell(gx + r.range(0, 6), gz + r.range(0, 8), r.range(22, 30), r.range(26, 36), r.pick(['wheat', 'corn', 'rape', 'greens']), false, 0);
-        }
-      }
-      // 房前屋后的小块菜地/条田：把村子与大片农田之间的空草地填满
-      for (let gx = -92; gx < 112; gx += 18) {
-        for (let gz = -58; gz < 122; gz += 18) {
-          if (r.chance(0.22)) continue;
-          addCell(gx + r.range(0, 5), gz + r.range(0, 5), r.range(9, 15), r.range(9, 14),
-            r.pick(['greens', 'wheat', 'greens', 'rape', 'wheat']), false, 0);
+      // 房前屋后的小块菜地：只在村边留几块，别把大田切成碎补丁
+      for (let gx = -92; gx < 112; gx += 26) {
+        for (let gz = -58; gz < 122; gz += 26) {
+          if (r.chance(0.45)) continue;
+          addCell(gx + r.range(0, 5), gz + r.range(0, 5), r.range(10, 16), r.range(10, 15),
+            r.pick(['greens', 'wheat', 'greens', 'rape']), false, 0);
         }
       }
       // 按离村中心距离排序，保证近处田块优先长庄稼
@@ -200,25 +185,35 @@
         perCrop[p.crop] = perCrop[p.crop] || [];
         perCrop[p.crop].push(p);
       }
-      // 按比例分配预算
+      // 按面积比例分配预算：先算每块田"铺满"需要多少棵，
+      // 预算不够时对整组按同一比例稀疏化——每块田都能分到庄稼，
+      // 不会再出现"近处密、远处整块空白"的浅色补丁（卫星图上田块是连续的）。
       const totalPlots = this.plots.length || 1;
       const r = this.rng;
       for (const cropKey in this.cropSets) {
         const plots = perCrop[cropKey] || [];
         const set = this.cropSets[cropKey];
-        const share = Math.floor(this.instanceBudget * (plots.length / totalPlots));
-        let budget = share;
-        for (const p of plots) {
-          if (budget <= 0) break;
-          const c = CROPS[cropKey];
-          const step = c.spacing * (this.quality === 'high' ? 1 : 1.25);
+        if (!plots.length) { set.commit(); continue; }
+        const c = CROPS[cropKey];
+        const step = c.spacing * (this.quality === 'high' ? 1 : 1.25);
+        let want = 0;
+        const grids = plots.map((p) => {
           const nx = Math.max(1, Math.floor((p.w - 2) / step));
           const nz = Math.max(1, Math.floor((p.d - 2) / step));
+          const n = nx * nz * 0.86;                    // 对应原来 14% 的随机跳过率
+          want += n;
+          return { nx, nz };
+        });
+        const cap = this.instanceBudget * (plots.length / totalPlots);
+        const factor = want > 0 ? Math.min(1, cap / want) : 1;
+        let budget = Math.floor(cap);
+        plots.forEach((p, pi) => {
+          const { nx, nz } = grids[pi];
           const dx = (p.w - 2) / nx, dz = (p.d - 2) / nz;
           for (let i = 0; i < nx; i++) {
             for (let j = 0; j < nz; j++) {
               if (budget <= 0) break;
-              if (r.chance(0.14)) continue;
+              if (!r.chance(0.86 * factor)) continue;
               const x = p.x - p.w / 2 + 1 + (i + 0.5) * dx + r.range(-0.3, 0.3);
               const z = p.z - p.d / 2 + 1 + (j + 0.5) * dz + r.range(-0.3, 0.3);
               const y = this.terrain.heightAt(x, z);
@@ -226,8 +221,8 @@
               budget--; used[cropKey]++;
             }
           }
-          total[cropKey] += 0;
-        }
+        });
+        total[cropKey] = plots.length;
         set.commit();
       }
       this._cropUsed = used;
@@ -262,11 +257,12 @@
       };
       const ridgeT = MT.texture.cloneTex('dirtRoad', 1, 1);
       const waterMat = MT.mat.water(0x3f6360, 0.7);
-      // 秧田水：不要像一块反光塑料板，压暗、减弱天光反射
-      waterMat.color.setHex(0x33564c);
-      waterMat.roughness = 0.26; waterMat.metalness = 0.1;
-      waterMat.envMapIntensity = 0.85; waterMat.opacity = 0.82;
-      if (waterMat.normalScale) waterMat.normalScale.set(0.6, 0.6);
+      // 秧田水：夏天稻田里长满秧苗，水面只剩暗绿的缝隙反光——
+      // 压到几乎不透明、近乎哑光，远看就是一块深绿田面（卫星图上没有发亮的薄荷色块）
+      waterMat.color.setHex(0x22392a);
+      waterMat.roughness = 1.0; waterMat.metalness = 0.0;
+      waterMat.envMapIntensity = 0.08; waterMat.opacity = 0.96;
+      if (waterMat.normalScale) waterMat.normalScale.set(0.15, 0.15);
 
       const sampleY = (x, z) => this.terrain.heightAt(x, z);
 
@@ -275,9 +271,10 @@
         const z0 = p.z - p.d / 2, z1 = p.z + p.d / 2;
         const lift = p.paddy ? 0.02 : 0.05;
         // 每块田一点明暗差异，避免整片田一个色（卫星图上相邻地块深浅不同）
-        const pv = 0.90 + (Math.abs(Math.sin(p.x * 12.9898 + p.z * 78.233) * 43758.5453) % 1) * 0.20;
+        const pv = 0.86 + (Math.abs(Math.sin(p.x * 12.9898 + p.z * 78.233) * 43758.5453) % 1) * 0.18;
         const tint = tintOf(p.crop);
-        const cr = tint.r * pv, cg = tint.g * pv, cb = tint.b * pv;
+        const mul = p.paddy ? 0.70 : 0.80;   // 秧田再压一档：卫星图上稻田是最深的绿
+        const cr = tint.r * pv * mul, cg = tint.g * pv * mul, cb = tint.b * pv * mul;
         // 地面（细分网格，贴合地形）
         const segX = Math.max(2, Math.round(p.w / 8)), segZ = Math.max(2, Math.round(p.d / 8));
         const base = vBase;

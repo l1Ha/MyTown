@@ -27,8 +27,16 @@
     { x: WA_CLUSTER.x, z: WA_CLUSTER.z, r: 24, y: 2.75, name: '任洼水塘' },
     { x: 104, z: 64, r: 17, y: 3.85, name: '藕塘' },
     { x: -186, z: -96, r: 14, y: 3.2, name: '苇塘' },
+    { x: 48, z: -86, r: 11, y: 3.1, name: '北塘' },
     // 任洼庄台西北的方塘（鱼塘）：卫星图上是一口长方形塘，四周有塘埂
     { x: -162, z: 4, r: 26, hw: 26, hd: 15, y: 3.0, name: '鱼塘', shape: 'rect' },
+  ];
+
+  // 用材林 / 苗圃：卫星图上有几块四四方方的深绿林子（树按行距栽，俯瞰能看到垄）
+  const PLANTATIONS = [
+    { x: 96, z: 186, w: 80, d: 52 },     // 村东南的杨树丰产林
+    { x: -240, z: 118, w: 64, d: 42 },
+    { x: 258, z: -78, w: 58, d: 40 },
   ];
 
   /** 到水面的"形状距离"：圆形塘=圆心距；方塘=到矩形的距离（内部为 0） */
@@ -150,7 +158,24 @@
     {
       // 村道：巷子只有三四米宽，路肩再一宽就成了"机场跑道"（俯瞰最像别墅区的地方）
       name: '村道', type: 'dirt', w: 3.0, shoulder: 1.3,
-      pts: [[18, -30], [19, -8], [20, 14], [18, 44], [16, 84], [12, 140], [8, 210], [6, 320], [4, 420]],
+      pts: [[14, -170], [15, -120], [16, -74], [17, -46], [18, -30], [19, -8], [20, 14], [18, 44], [16, 84], [12, 140], [8, 210], [6, 320], [4, 420]],
+    },
+    // 田间路网：卫星图上田被浅色土路切成大方格，路边再镶树行子
+    {
+      name: '田间路', type: 'dirt', w: 2.2, shoulder: 1.3,
+      pts: [[-470, 60], [-220, 58], [40, 56], [280, 54], [470, 52]],
+    },
+    {
+      name: '田间路', type: 'dirt', w: 2.4, shoulder: 1.4,
+      pts: [[-470, 244], [-220, 242], [40, 240], [280, 238], [470, 236]],
+    },
+    {
+      name: '田间路', type: 'dirt', w: 2.2, shoulder: 1.3,
+      pts: [[-160, -170], [-158, -40], [-156, 80], [-154, 220], [-152, 340]],
+    },
+    {
+      name: '田间路', type: 'dirt', w: 2.4, shoulder: 1.4,
+      pts: [[150, -170], [150, -20], [148, 130], [146, 280], [144, 400]],
     },
     // 房排之间的巷子：土路，不是草坪（卫星图上村子内部不该是一片绿）
     {
@@ -466,6 +491,7 @@
       const sandT = MT.texture.cloneTex('dirtRoad', 70, 70);
       const mat = new THREE.MeshStandardMaterial({
         map: grassT, vertexColors: true, roughness: 1.0, metalness: 0.0,
+        color: 0xb9c8a4,
       });
       mat.userData.splat = { soilT, roadT, sandT };
       mat.onBeforeCompile = (shader) => {
@@ -503,14 +529,14 @@
                 texelColor.rgb *= mix(0.86, 1.16, mac) * macTint;
                 // 田块拼布：卫星图上最显眼的是"一格一色"的田地（麦茬偏黄、水稻偏青、翻耕地偏褐），
                 // 用两块不同尺度的方块噪声做出大田的色块，只在草皮权重上叠加
-                float blkA = _vn(floor(vWPos.xz / 24.0) * 0.731 + 3.7);
-                float blkB = _vn(floor(vWPos.xz / 57.0) * 0.413 + 19.1);
-                vec3 fieldA = vec3(0.93, 1.04, 0.84);   // 麦茬 / 玉米地：偏黄绿
-                vec3 fieldB = vec3(0.88, 1.00, 0.90);   // 水稻田：偏青
-                vec3 fieldC = vec3(1.03, 0.98, 0.87);   // 翻耕地 / 油菜茬：偏褐
+                float blkA = _vn(floor(vWPos.xz / 64.0) * 0.731 + 3.7);
+                float blkB = _vn(floor(vWPos.xz / 150.0) * 0.413 + 19.1);
+                vec3 fieldA = vec3(0.72, 0.90, 0.62);   // 麦茬 / 玉米地：偏黄绿
+                vec3 fieldB = vec3(0.58, 0.82, 0.58);   // 水稻田：深绿
+                vec3 fieldC = vec3(0.85, 0.76, 0.55);   // 翻耕地 / 油菜茬：偏褐
                 vec3 fieldTint = mix(fieldA, fieldB, blkA);
                 fieldTint = mix(fieldTint, fieldC, smoothstep(0.55, 0.92, blkB) * 0.7);
-                texelColor.rgb *= mix(vec3(1.0), fieldTint, mGrass * 0.52);
+                texelColor.rgb *= mix(vec3(1.0), fieldTint, mGrass * 0.82);
                 diffuseColor *= texelColor;
               #endif
             `);
@@ -537,8 +563,10 @@
 
       // 水塘（圆形 / 方形）
       for (const p of PONDS) {
-        // 鱼塘水面更深沉一点（养鱼塘常清塘，水色比村口塘暗）
-        const m = MT.mat.water(p.shape === 'rect' ? 0x24494e : 0x2e5d63, p.shape === 'rect' ? 0.72 : 0.8);
+        // 鱼塘水面更深沉一点（养鱼塘常清塘，水色比村口塘暗）；藕塘水面上浮着绿萍，发绿
+        let wcol = p.shape === 'rect' ? 0x24494e : 0x2e5d63;
+        if (p.name === '藕塘') wcol = 0x3a6330;   // 绿萍塘：绿但发暗，不要荧光绿
+        const m = MT.mat.water(wcol, p.shape === 'rect' ? 0.72 : (p.name === '藕塘' ? 0.9 : 0.8));
         if (p.shape === 'rect') {
           // 方塘：矩形水面（比塘底大一点，盖住边坡）+ 四周一圈塘埂
           const g = new THREE.PlaneGeometry(p.hw * 2 + 4.4, p.hd * 2 + 4.4, 10, 8);
@@ -684,6 +712,6 @@
 
   MT.Terrain = Terrain;
   MT.TerrainConst = {
-    WORLD, HALF, SEG, CELL, RIVER_Z, RIVER_HALF, WATER_Y, LEVEE_Z, LEVEE_H, VILLAGE, WA_CLUSTER, PONDS, ROAD_DEFS,
+    WORLD, HALF, SEG, CELL, RIVER_Z, RIVER_HALF, WATER_Y, LEVEE_Z, LEVEE_H, VILLAGE, WA_CLUSTER, PONDS, PLANTATIONS, ROAD_DEFS,
   };
 })();
