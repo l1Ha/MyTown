@@ -668,9 +668,10 @@
         this.fieldMat.color.copy(c);
         this.ridgeMat.color.setHex(season === 'winter' ? 0xcfc6b0 : 0xa89670);
       }
-      // 秧田水色
+      // 秧田水色：夏天稻田长满秧苗，水面只剩暗绿缝隙反光——
+      // 这里会覆盖 _buildPlots 里的初始色，四季都要压住，别再回到浅薄荷色
       if (this.paddyWater) {
-        const wc = { spring: 0x7f9c86, summer: 0x6d8f76, autumn: 0x86a07a, winter: 0x9aa8ac }[key];
+        const wc = { spring: 0x35503f, summer: 0x27422f, autumn: 0x44543c, winter: 0x565e56 }[key];
         this.paddyWater.material.color.setHex(wc);
       }
     }

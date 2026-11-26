@@ -262,10 +262,11 @@
         }
       }
 
-      /* 1.6 用材林 / 苗圃：成行成垄的深绿方块，卫星图上一眼就能认出来 */
+      /* 1.6 用材林 / 苗圃：成行成垄的深绿方块，卫星图上一眼就能认出来
+       * （行距 5.5m：丰产林的杨树栽得密，俯瞰是一整块深绿，能看见垄） */
       for (const b of (MT.TerrainConst.PLANTATIONS || [])) {
-        const rows = Math.max(2, Math.floor(b.d / 7));
-        const cols = Math.max(2, Math.floor(b.w / 7));
+        const rows = Math.max(2, Math.floor(b.d / 5.5));
+        const cols = Math.max(2, Math.floor(b.w / 5.5));
         for (let i = 0; i < rows; i++) {
           for (let j = 0; j < cols; j++) {
             const x = b.x - b.w / 2 + (j + 0.5) * (b.w / cols) + r.range(-1.4, 1.4);
