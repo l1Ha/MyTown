@@ -263,17 +263,20 @@
       }
 
       /* 1.6 用材林 / 苗圃：成行成垄的深绿方块，卫星图上一眼就能认出来
-       * （行距 5.5m：丰产林的杨树栽得密，俯瞰是一整块深绿，能看见垄） */
+       * （行距 4.6m + 树冠放大加深：丰产林俯瞰是一整块深绿，只隐约看见垄） */
       for (const b of (MT.TerrainConst.PLANTATIONS || [])) {
-        const rows = Math.max(2, Math.floor(b.d / 5.5));
-        const cols = Math.max(2, Math.floor(b.w / 5.5));
+        const rows = Math.max(2, Math.floor(b.d / 4.6));
+        const cols = Math.max(2, Math.floor(b.w / 4.6));
         for (let i = 0; i < rows; i++) {
           for (let j = 0; j < cols; j++) {
-            const x = b.x - b.w / 2 + (j + 0.5) * (b.w / cols) + r.range(-1.4, 1.4);
-            const z = b.z - b.d / 2 + (i + 0.5) * (b.d / rows) + r.range(-1.4, 1.4);
+            const x = b.x - b.w / 2 + (j + 0.5) * (b.w / cols) + r.range(-1.1, 1.1);
+            const z = b.z - b.d / 2 + (i + 0.5) * (b.d / rows) + r.range(-1.1, 1.1);
             if (inWater(x, z)) continue;
             if (T.slopeAt(x, z) > 0.45) continue;
-            placements.push({ key: r.chance(0.86) ? 'poplar' : 'locust', x, z, s: r.range(0.9, 1.15) });
+            placements.push({
+              key: r.chance(0.9) ? 'poplar' : 'locust',
+              x, z, s: r.range(1.0, 1.28), tint: 0.78,
+            });
           }
         }
       }
@@ -292,7 +295,8 @@
           if (inWater(x, z)) continue;
           if (T.slopeAt(x, z) > 0.5) continue;
           const key = r.pick(['locust', 'paulownia', 'poplar', 'peach', 'persimmon', 'locust', 'willow']);
-          placements.push({ key, x, z, s: r.range(0.8, 1.15) });
+          // 村里的大树比田边行道树更粗壮，树冠连成片才像卫星图
+          placements.push({ key, x, z, s: r.range(0.95, 1.35), tint: 0.9 });
         }
       }
 
@@ -456,6 +460,7 @@
           const ch = lerp(spec.crownH[0], spec.crownH[1], rng.next()) * p.s;
           const baseY = gy + h * 0.6 + ch * 0.45;
           const willow = !!spec.droop;
+          const tint = p.tint || 1;      // 用材林/村内大树的整体压暗
 
           // 树枝：从中上部向外分叉（偏移方向必须与旋转后的 +Y 方向一致，否则会悬空）
           const tips = [];
@@ -497,7 +502,7 @@
               const bz = p.z + Math.sin(az) * Math.cos(el) * cr * rr;
               const by = baseY + Math.sin(el) * ch * rr * 0.7 - (willow ? ch * 0.12 : 0);
               const csz = cr * rng.range(0.3, 0.48) * (willow ? 0.85 : 1);
-              leafSet.add({ x: bx, y: by, z: bz }, rng.next() * TAU, csz, 1, 0);
+              leafSet.add({ x: bx, y: by, z: bz }, rng.next() * TAU, csz, tint, 0);
               const li = leafSet.items[leafSet.items.length - 1];
               li.rx = rng.range(-0.7, 0.7); li.rz = rng.range(-0.7, 0.7);
               li.sy = willow ? 0.85 : rng.range(0.85, 1.1);
@@ -507,14 +512,14 @@
             if (willow) {
               for (let k = 0; k < 8; k++) {
                 const az = rng.next() * TAU, rad = cr * rng.range(0.5, 1.0);
-                leafSet.add({ x: p.x + Math.cos(az) * rad, y: gy + h * 0.6 + rng.range(-1.4, 0.3), z: p.z + Math.sin(az) * rad }, rng.next() * TAU, cr * rng.range(0.4, 0.6), 1, 0);
+                leafSet.add({ x: p.x + Math.cos(az) * rad, y: gy + h * 0.6 + rng.range(-1.4, 0.3), z: p.z + Math.sin(az) * rad }, rng.next() * TAU, cr * rng.range(0.4, 0.6), tint, 0);
                 const li = leafSet.items[leafSet.items.length - 1];
                 li.rz = rng.range(-0.9, 0.9); li.sy = 0.85; li.ao = 0.85;
               }
             }
             // 枝梢补叶：让树冠外缘有叶子，不是一根根光树枝
             for (const tip of tips) {
-              leafSet.add({ x: tip.x, y: tip.y, z: tip.z }, rng.next() * TAU, cr * rng.range(0.32, 0.46), 1, 0);
+              leafSet.add({ x: tip.x, y: tip.y, z: tip.z }, rng.next() * TAU, cr * rng.range(0.32, 0.46), tint, 0);
               const li = leafSet.items[leafSet.items.length - 1];
               li.rx = rng.range(-0.5, 0.5); li.rz = rng.range(-0.5, 0.5);
               li.sy = rng.range(0.85, 1.1); li.ao = 0.9;
@@ -528,7 +533,7 @@
                   x: p.x + Math.cos(az) * rad,
                   y: baseY - ch * rng.range(0.28, 0.5),
                   z: p.z + Math.sin(az) * rad,
-                }, rng.next() * TAU, cr * rng.range(0.28, 0.4), 1, 0);
+                }, rng.next() * TAU, cr * rng.range(0.28, 0.4), tint, 0);
                 const li = leafSet.items[leafSet.items.length - 1];
                 li.rx = rng.range(-0.9, 0.9); li.rz = rng.range(-0.9, 0.9);
                 li.sy = rng.range(0.8, 1.0); li.ao = 0.8;
@@ -541,7 +546,7 @@
                 x: p.x + Math.cos(ca) * cr * crr,
                 y: baseY + Math.sin(ce) * ch * crr * 0.55,
                 z: p.z + Math.sin(ca) * cr * crr,
-              }, rng.next() * TAU, cr * rng.range(0.36, 0.5), 1, 0);
+              }, rng.next() * TAU, cr * rng.range(0.36, 0.5), tint, 0);
               coreSet.items[coreSet.items.length - 1].ao = 0.42 + 0.58 * crr;
             }
           }
@@ -1043,13 +1048,13 @@
         t.leaf.applySeason((it, col) => {
           col.copy(c);
           // 每棵树轻微色差 + 树冠自遮蔽（内暗外亮）
-          const k = (0.86 + ((it.ry * 7919) % 1) * 0.3) * (it.ao === undefined ? 1 : it.ao);
+          const k = (0.86 + ((it.ry * 7919) % 1) * 0.3) * (it.ao === undefined ? 1 : it.ao) * (it.tint || 1);
           col.multiplyScalar(k);
           return col;
         }, (it) => (bare ? (spec.leafGeo === 'cone' ? 0.95 : 0.16) : 1));
         t.leaf.mesh.visible = !bare || spec.leafGeo === 'cone';
         if (t.core) {
-          t.core.applySeason((it, col) => { col.copy(c); col.multiplyScalar((0.86 + ((it.ry * 7919) % 1) * 0.3) * (it.ao === undefined ? 1 : it.ao)); return col; }, (it) => (bare ? 0.16 : 1));
+          t.core.applySeason((it, col) => { col.copy(c); col.multiplyScalar((0.86 + ((it.ry * 7919) % 1) * 0.3) * (it.ao === undefined ? 1 : it.ao) * (it.tint || 1)); return col; }, (it) => (bare ? 0.16 : 1));
           t.core.mesh.visible = !bare;
         }
       }
