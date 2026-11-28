@@ -815,11 +815,14 @@
     const root = new THREE.Group();
     // 彩钢瓦：如今豫南一大半平房都换成了红/蓝压型钢板屋顶（卫星图上一眼就能看出来）
     if (opts.roofMat === undefined && opts.style !== 'old') {
+      // 村道两侧的院子彩钢瓦更集中（参考图上红蓝屋顶沿路连续），
+      // steelChance 由 village.js 按离村道的距离传入
+      const steelChance = opts.steelChance === undefined ? 0.76 : opts.steelChance;
       const rv = rng.next();
-      if (rv < 0.5) {
+      if (rv < steelChance * 0.66) {
         opts.roofMat = MT.mat.steelRoof(0xb03826, 3, 2);      // 大红
         opts.ridgeMat = MT.mat.steelRoof(0x8c2822, 3, 2);
-      } else if (rv < 0.76) {
+      } else if (rv < steelChance) {
         opts.roofMat = MT.mat.steelRoof(0x33678f, 3, 2);      // 蓝色
         opts.ridgeMat = MT.mat.steelRoof(0x28536f, 3, 2);
       }
@@ -876,8 +879,10 @@
       }
     }
     // 院内地面（水泥院，但用旧一点、发灰的水泥，别白得刺眼）
+    // 各家院子新旧不同：有的水泥发青灰，有的还是土院泛黄褐
     const yardMat = MT.mat.cement(1, 1).clone();
-    yardMat.color = new THREE.Color(0xada595);
+    const yardTone = rng.chance(0.32) ? 0x9d9a90 : (rng.chance(0.5) ? 0xada595 : 0xb3a998);
+    yardMat.color = new THREE.Color(yardTone);
     const floor = G.plane(yardW - 0.6, halfYard * 2 - 0.3, yardMat, (yardW) / 2, halfYard);
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(0, 0.045, (yMin + yMax) / 2);

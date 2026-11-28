@@ -156,6 +156,8 @@
           yard: h.full ? undefined : false,        // 后排只在卫星图上看得见屋顶与院墙，省掉院内小物件
           wallMat: h.style === 'old' ? MT.M().mud : (r.chance(0.4) ? MT.M().brickGrey : MT.M().brickRed),
           gateSide: r.chance(0.5) ? 1 : -1,
+          // 村道两侧（x=9 / x=29 两排）彩钢瓦更密，沿路形成连续的红蓝色带
+          steelChance: Math.abs(h.x - MT.TerrainConst.VILLAGE.x) < 24 ? 0.92 : 0.76,
         });
         this.place(court, h.x, h.z, h.ry);
         this.zone(h.x, h.z, 9);

@@ -286,6 +286,7 @@
 
       const sampleY = (x, z) => this.terrain.heightAt(x, z);
 
+      let paddyIdx = 0;
       for (const p of this.plots) {
         const x0 = p.x - p.w / 2, x1 = p.x + p.w / 2;
         const z0 = p.z - p.d / 2, z1 = p.z + p.d / 2;
@@ -350,13 +351,15 @@
         if (p.paddy) {
           const segX2 = Math.max(2, Math.round(p.w / 10)), segZ2 = Math.max(2, Math.round(p.d / 10));
           const b2 = wBase;
+          // 秧田行纹：相邻田块横竖交替（参考图上各田块栽秧方向不一）
+          const rowSwap = (paddyIdx++ % 2) === 1;
           for (let j = 0; j <= segZ2; j++) {
             for (let i = 0; i <= segX2; i++) {
               const x = lerp(x0 + 0.5, x1 - 0.5, i / segX2), z = lerp(z0 + 0.5, z1 - 0.5, j / segZ2);
               const wy = sampleY(x, z) + 0.16;
               waterArr.pos.push(x, wy, z);
               waterArr.nor.push(0, 1, 0);
-              waterArr.uv.push((x) / 8, (z) / 8);
+              waterArr.uv.push(rowSwap ? z / 8 : x / 8, rowSwap ? x / 8 : z / 8);
             }
           }
           for (let j = 0; j < segZ2; j++) {
