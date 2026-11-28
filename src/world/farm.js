@@ -55,7 +55,7 @@
       this.plots = [];
       this.cropSets = {};
       // 大田块时代：预算按面积铺（稀疏化由填充逻辑统一处理），画质优先可给足
-      this.instanceBudget = opts.quality === 'low' ? 9000 : opts.quality === 'medium' ? 22000 : 42000;
+      this.instanceBudget = opts.quality === 'low' ? 9000 : opts.quality === 'medium' ? 22000 : 48000;
       this._layoutPlots();
       MT.farmPlots = this.plots;     // 供植被系统避让（不在田里长树）
       this._buildCropSets();
@@ -263,6 +263,26 @@
       waterMat.roughness = 1.0; waterMat.metalness = 0.0;
       waterMat.envMapIntensity = 0.08; waterMat.opacity = 0.96;
       if (waterMat.normalScale) waterMat.normalScale.set(0.15, 0.15);
+      // 秧田行纹：水面 UV 每 8m 一块，贴图里画 4 条深色行沟（行距 2m），
+      // 远看稻田不再是一块死平的深绿，近看能看出栽秧的垄行。
+      const paddyRowT = MT.texture.tex('paddyRows', 256, (ctx, s) => {
+        ctx.fillStyle = '#f3f5ec'; ctx.fillRect(0, 0, s, s);
+        const rows = 4;
+        for (let i = 0; i < rows; i++) {
+          const y = (i + 0.5) * s / rows;
+          ctx.fillStyle = 'rgba(92,110,84,0.52)';
+          ctx.fillRect(0, y - s / rows * 0.15, s, s / rows * 0.30);
+        }
+        // 斑驳：打散条纹的印刷感
+        for (let i = 0; i < 2200; i++) {
+          const x = Math.random() * s, y = Math.random() * s;
+          const a = 0.025 + Math.random() * 0.05;
+          ctx.fillStyle = Math.random() < 0.5 ? `rgba(255,255,255,${a})` : `rgba(36,56,36,${a})`;
+          ctx.fillRect(x, y, 1 + Math.random() * 2, 1);
+        }
+      });
+      waterMat.map = paddyRowT;
+      waterMat.needsUpdate = true;
 
       const sampleY = (x, z) => this.terrain.heightAt(x, z);
 
