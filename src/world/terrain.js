@@ -567,6 +567,17 @@
         let wcol = p.shape === 'rect' ? 0x24494e : 0x2e5d63;
         if (p.name === '藕塘') wcol = 0x3a6330;   // 绿萍塘：绿但发暗，不要荧光绿
         const m = MT.mat.water(wcol, p.shape === 'rect' ? 0.72 : (p.name === '藕塘' ? 0.9 : 0.8));
+        // 圆塘压掉镜面天光：卫星图上塘水是暗绿/墨绿，不是亮青色的天空倒影
+        if (p.shape !== 'rect') {
+          if (p.name === '藕塘') {
+            m.color.setHex(0x35592c);
+            m.envMapIntensity = 0.55; m.roughness = 0.55; m.opacity = 0.92;
+          } else {
+            m.color.setHex(0x284d4c);
+            m.envMapIntensity = 0.85; m.roughness = 0.32; m.opacity = 0.86;
+          }
+          m.emissive.copy(m.color).multiplyScalar(0.05);
+        }
         if (p.shape === 'rect') {
           // 方塘：矩形水面（比塘底大一点，盖住边坡）+ 四周一圈塘埂
           const g = new THREE.PlaneGeometry(p.hw * 2 + 4.4, p.hd * 2 + 4.4, 10, 8);
